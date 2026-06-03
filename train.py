@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from model import TinyDecoder
 from model_config import TinyDecoderConfig
+from model_config import estimate_param_count
 from prepare_datasets import augment_ocr, encode_pair
 
 
@@ -134,6 +135,27 @@ def load_train_val(stage: int, data_dir: str, tokenizer_path: str | None, max_se
     return train, vals
 
 
+def lm_dataset_name() -> str:
+    return os.environ.get("LM_DATASET_NAME", "lm_prose")
+
+
+def dataset_fingerprint(data_dir: str, stage: int) -> dict[str, object]:
+    if stage == 0:
+        name = lm_dataset_name()
+        train_path = os.path.join(data_dir, name, "train")
+        val_path = os.path.join(data_dir, name, "val")
+        train = load_from_disk(train_path)
+        val = load_from_disk(val_path)
+        return {
+            "dataset_name": name,
+            "train_rows": len(train),
+            "val_rows": len(val),
+            "train_fingerprint": getattr(train, "_fingerprint", ""),
+            "val_fingerprint": getattr(val, "_fingerprint", ""),
+        }
+    return {"dataset_name": f"stage{stage}"}
+
+
 def lr_at(step: int, total_steps: int, base_lr: float, min_lr: float, warmup: int) -> float:
     if step < warmup:
         return base_lr * (step + 1) / max(1, warmup)
@@ -161,7 +183,7 @@ def validate(model, loaders, device, fp16: bool, label_smoothing: float) -> floa
     return sum(losses) / max(1, len(losses))
 
 
-def save_checkpoint(path: str, model, optimizer, scaler, step: int, epoch: int, val_loss: float) -> None:
+def save_checkpoint(path: str, model, optimizer, scaler, step: int, epoch: int, val_loss: float, metadata: dict[str, object] | None = None) -> None:
     raw = model._orig_mod if hasattr(model, "_orig_mod") else model
     torch.save(
         {
@@ -172,6 +194,7 @@ def save_checkpoint(path: str, model, optimizer, scaler, step: int, epoch: int, 
             "epoch": epoch,
             "val_loss": val_loss,
             "config": raw.config.__dict__,
+            "metadata": metadata or {},
         },
         path,
     )
@@ -205,6 +228,8 @@ def main() -> None:
     p.add_argument("--wandb_project", help="Enable W&B logging with this project name.")
     p.add_argument("--require_cuda", action="store_true", help="Exit immediately unless CUDA is available.")
     p.add_argument("--reset_optimizer_state", action="store_true", help="Load checkpoint model weights but start optimizer/step/epoch from scratch.")
+    p.add_argument("--experiment_name", help="Stable experiment name for comparing model sizes.")
+    p.add_argument("--notes", default="", help="Short free-form note written to metadata.json.")
     args = p.parse_args()
 
     d = DEFAULTS[args.stage]
@@ -220,6 +245,7 @@ def main() -> None:
 
     config = TinyDecoderConfig.load_json(args.config_path)
     config.max_seq_len = args.max_seq_len or (256 if args.stage in {0, 1} else 512 if args.stage == 2 else 1024)
+    param_count = estimate_param_count(config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.require_cuda and device.type != "cuda":
         raise RuntimeError("CUDA is required for this run, but torch.cuda.is_available() is False.")
@@ -255,10 +281,49 @@ def main() -> None:
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, collate_fn=collate, drop_last=True)
     val_loaders = [DataLoader(v, batch_size=args.batch_size, shuffle=False, collate_fn=collate) for v in val_ds]
     total_steps = max(1, (len(train_loader) * args.epochs) // args.grad_accum_steps)
+    effective_batch_tokens = args.batch_size * args.grad_accum_steps * config.max_seq_len
+    metadata = {
+        "experiment_name": args.experiment_name or os.path.basename(os.path.abspath(args.output_dir)),
+        "notes": args.notes,
+        "stage": args.stage,
+        "config_path": args.config_path,
+        "param_count": param_count,
+        "max_seq_len": config.max_seq_len,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "grad_accum_steps": args.grad_accum_steps,
+        "effective_batch_tokens": effective_batch_tokens,
+        "lr": args.lr,
+        "min_lr": d["min_lr"],
+        "warmup_steps": args.warmup_steps,
+        "weight_decay": d["weight_decay"],
+        "label_smoothing": d["label_smoothing"],
+        "fp16": bool(args.fp16),
+        "max_steps": args.max_steps,
+        "dataset": dataset_fingerprint(args.data_dir, args.stage),
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    with open(os.path.join(args.output_dir, "metadata.json"), "w", encoding="utf-8") as mf:
+        json.dump(metadata, mf, indent=2, sort_keys=True)
+    print("experiment_metadata=" + json.dumps(metadata, sort_keys=True))
 
     new_log = not os.path.exists(log_path) or args.overwrite
     with open(log_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["step", "epoch", "train_loss", "val_loss", "lr", "timestamp"])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "experiment_name",
+                "param_count",
+                "dataset_name",
+                "step",
+                "epoch",
+                "tokens_seen",
+                "train_loss",
+                "val_loss",
+                "lr",
+                "timestamp",
+            ],
+        )
         if new_log:
             writer.writeheader()
         try:
@@ -292,7 +357,18 @@ def main() -> None:
                     global_step += 1
                     if global_step % d["val_every"] == 0:
                         val = validate(model, val_loaders, device, args.fp16, d["label_smoothing"])
-                        row = {"step": global_step, "epoch": epoch + 1, "train_loss": running / max(1, d["val_every"]), "val_loss": val, "lr": lr, "timestamp": datetime.utcnow().isoformat()}
+                        row = {
+                            "experiment_name": metadata["experiment_name"],
+                            "param_count": param_count,
+                            "dataset_name": metadata["dataset"]["dataset_name"] if isinstance(metadata["dataset"], dict) else "",
+                            "step": global_step,
+                            "epoch": epoch + 1,
+                            "tokens_seen": global_step * effective_batch_tokens,
+                            "train_loss": running / max(1, d["val_every"]),
+                            "val_loss": val,
+                            "lr": lr,
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }
                         writer.writerow(row)
                         f.flush()
                         if run:
@@ -300,16 +376,16 @@ def main() -> None:
                         running = 0.0
                         if val < best_val:
                             best_val = val
-                            save_checkpoint(os.path.join(args.output_dir, "best.pt"), model, optimizer, scaler, global_step, epoch, best_val)
+                            save_checkpoint(os.path.join(args.output_dir, "best.pt"), model, optimizer, scaler, global_step, epoch, best_val, metadata)
                             save_safetensors(os.path.join(args.output_dir, "best.safetensors"), model)
                     if global_step % d["save_every"] == 0:
-                        save_checkpoint(os.path.join(args.output_dir, f"step_{global_step}.pt"), model, optimizer, scaler, global_step, epoch, best_val)
+                        save_checkpoint(os.path.join(args.output_dir, f"step_{global_step}.pt"), model, optimizer, scaler, global_step, epoch, best_val, metadata)
                     if args.max_steps and global_step >= args.max_steps:
                         stop_training = True
                         break
                 pbar.set_postfix(step=global_step, loss=float(loss.item()) * args.grad_accum_steps)
-            save_checkpoint(os.path.join(args.output_dir, f"epoch_{epoch + 1}.pt"), model, optimizer, scaler, global_step, epoch + 1, best_val)
-            save_checkpoint(os.path.join(args.output_dir, "latest.pt"), model, optimizer, scaler, global_step, epoch + 1, best_val)
+            save_checkpoint(os.path.join(args.output_dir, f"epoch_{epoch + 1}.pt"), model, optimizer, scaler, global_step, epoch + 1, best_val, metadata)
+            save_checkpoint(os.path.join(args.output_dir, "latest.pt"), model, optimizer, scaler, global_step, epoch + 1, best_val, metadata)
             if stop_training:
                 break
         if run:

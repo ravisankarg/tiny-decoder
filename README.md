@@ -15,6 +15,8 @@ We are using an iterative approach:
 
 The current reset is focused on base LM quality first. OCR, instruction parsing, and autocomplete will come later after the plain language model behaves sensibly.
 
+The main experiment design is to keep the dataset and training settings constant, then compare how different tiny parameter counts learn across the same epochs, steps, and token budget. Each run writes metadata and CSV metrics so model-size comparisons are explicit.
+
 ## Iteration 1: Failed Mixed-Stage Training
 
 The first iteration trained a small decoder with about 20M parameters:
@@ -99,12 +101,21 @@ New model config:
 - 256 token context for base LM
 - About 39.7M parameters
 
+Additional comparison configs are included for smaller runs:
+
+- `model_config_10m.json`: about 8.8M parameters
+- `model_config.json`: about 20.3M parameters
+- `model_config_30m.json`: about 31.3M parameters
+- `model_config_40m.json`: about 39.7M parameters
+
 New files/scripts:
 
 - `model_config_40m.json`
 - `data/lm_base/`
 - `scripts/prepare_lm_base.sh`
 - `scripts/start_lm_base_background.sh`
+- `scripts/start_lm_experiment_background.sh`
+- `scripts/compare_lm_experiments.py`
 
 The packed LM dataset is built from `data/corpus.txt` into:
 
@@ -115,8 +126,14 @@ The improved prose LM path also adds app-description sources so the base model s
 
 Training output goes to:
 
-- `checkpoints/lm_base/`
-- `logs/lm_base.out`
+- `checkpoints/<experiment_name>/`
+- `logs/<experiment_name>.out`
+
+Each experiment stores:
+
+- `metadata.json`: parameter count, dataset fingerprint, batch settings, learning rate, token budget, and notes
+- `training_log.csv`: step, epoch, tokens seen, train loss, validation loss, and learning rate
+- checkpoints and exported safetensors for the best model
 
 ## What Must Pass Before Task Training
 

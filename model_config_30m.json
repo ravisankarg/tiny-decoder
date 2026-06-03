@@ -1,0 +1,14 @@
+{
+  "n_layers": 10,
+  "hidden_dim": 448,
+  "n_heads": 7,
+  "ffn_dim": 1792,
+  "vocab_size": 16000,
+  "max_seq_len": 256,
+  "dropout": 0.1,
+  "activation": "gelu",
+  "pad_token_id": 0,
+  "bos_token_id": 2,
+  "eos_token_id": 3,
+  "task_token_ids": [4, 5, 6]
+}
