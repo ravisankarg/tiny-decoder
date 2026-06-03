@@ -1,8 +1,29 @@
 # Tiniest Decoder
 
-This repo is an experiment to build the smallest useful decoder-only language model that can run locally on a small GPU, then gradually add narrow task skills such as OCR-style field extraction, instruction parsing, and autocomplete.
+This repo is an ablation study for tiny decoder-only language models. The experiment keeps the data, tokenizer, environment, optimizer settings, context length, and effective token budget as constant as possible, then compares how different decoder sizes learn.
 
-The main goal is not to train a large general assistant. The goal is to learn how far a very small decoder can go when the data pipeline, objective, tokenizer, model size, and finetuning stages are designed carefully.
+The main goal is not to train a large general assistant. The goal is to learn how far very small decoders can go when the data pipeline, objective, tokenizer, model size, and finetuning stages are designed carefully.
+
+The current study compares approximately 9M, 20M, 31M, and 40M parameter decoder configs on the same base LM corpus. Once the base LM behavior is coherent, later iterations will add narrow task skills such as OCR-style field extraction, instruction parsing, and autocomplete.
+
+## Ablation Study Goal
+
+The core question is:
+
+> With the same data and same training environment, how much does decoder size alone change learning quality?
+
+To make that comparison meaningful, each model-size run should keep these fixed:
+
+- same tokenizer
+- same LM dataset
+- same sequence length
+- same number of epochs or tokens seen
+- same validation split
+- same learning-rate schedule
+- same effective tokens per optimizer update
+- same GPU class and mixed-precision settings
+
+Only the model config and the physical batch/accumulation split should change. The physical batch size changes because larger models need more VRAM, but gradient accumulation is adjusted to keep the effective token budget per update constant.
 
 ## Current Direction
 
@@ -156,6 +177,26 @@ The LM experiment launcher chooses physical batch size from model size so smalle
 - ~40M params: batch 4, accumulation 16
 
 These defaults are intentionally conservative for a 4 GB RTX 3050 Laptop GPU with FP16 and gradient checkpointing. They can be overridden with `LM_BATCH_SIZE` and `LM_GRAD_ACCUM_STEPS` when a specific GPU has more or less usable memory.
+
+## First Ablation Results
+
+The first controlled comparison used the same `lm_prose` dataset, 3 epochs, 7,500 training steps, 122.88M tokens seen, and 16,384 effective tokens per optimizer update for all four model sizes.
+
+| Experiment | Parameters | Batch | Accum | Tokens/update | Steps | Tokens seen | Validation loss |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `lm_10m` | 8,835,072 | 32 | 2 | 16,384 | 7,500 | 122,880,000 | 4.2634 |
+| `lm_20m` | 20,340,480 | 16 | 4 | 16,384 | 7,500 | 122,880,000 | 3.9137 |
+| `lm_30m` | 31,311,616 | 8 | 8 | 16,384 | 7,500 | 122,880,000 | 3.7632 |
+| `lm_40m` | 39,716,864 | 4 | 16 | 16,384 | 7,500 | 122,880,000 | 3.6499 |
+
+The validation loss improved steadily as parameter count increased. This is the expected direction and suggests that the ablation setup is useful. However, generated text was still weak, so this run should be treated as a pipeline baseline, not a solved base model.
+
+Technical notes from this result:
+
+- 122.88M tokens seen is too small to judge final tiny-LM capability.
+- The larger models benefited from capacity even under the same token budget.
+- The train-loss column from this run was not a reliable cross-model comparison because the logging denominator was fixed after this run; validation loss is the cleaner signal.
+- The next dataset target is around 1B tokens so the same ablation can be repeated at a more meaningful scale.
 
 ## What Must Pass Before Task Training
 
