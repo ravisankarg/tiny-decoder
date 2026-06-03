@@ -135,6 +135,15 @@ Each experiment stores:
 - `training_log.csv`: step, epoch, tokens seen, train loss, validation loss, and learning rate
 - checkpoints and exported safetensors for the best model
 
+The LM experiment launcher chooses physical batch size from model size so smaller models use more of the available GPU memory. Gradient accumulation is adjusted to keep the effective tokens per update close across runs:
+
+- ~9M params: batch 64, accumulation 1
+- ~20M params: batch 32, accumulation 2
+- ~31M params: batch 20, accumulation 3
+- ~40M params: batch 16, accumulation 4
+
+These defaults target a 4 GB laptop GPU with FP16 and gradient checkpointing. They can be overridden with `LM_BATCH_SIZE` and `LM_GRAD_ACCUM_STEPS` when a specific GPU has more or less usable memory.
+
 ## What Must Pass Before Task Training
 
 Before adding OCR/instruction/autocomplete again, the base LM should produce at least somewhat coherent continuations for prompts like:
