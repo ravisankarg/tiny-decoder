@@ -20,6 +20,10 @@ PROSE_BANNED_PHRASES = {
     "pay a deposit",
     "private halls",
 }
+APP_DESC_DATASETS = [
+    ("recmeapp/mobilerec", {"data_files": "app_meta/app_meta.csv"}),
+    ("macpaw-research/mac-app-store-apps-descriptions", {"data_files": "descriptions.csv"}),
+]
 DEFAULT_CODE_CORPUS = "/home/ravi/codex/std/data/processed_code_full/train.jsonl"
 DEFAULT_FLICKR_GLOB = "data/flickr/*.parquet"
 SNIPS_ACTION = {
@@ -155,9 +159,10 @@ def validate_output_format(text: str, task_token: str) -> bool:
     return False
 
 
-def load_all_splits(path: str, name: str | None = None):
+def load_all_splits(path: str, name: str | None = None, **extra_kwargs):
     token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN")
     kwargs = {"token": token} if token else {}
+    kwargs.update(extra_kwargs)
     if path == "nlu_evaluation_data":
         kwargs["trust_remote_code"] = True
     ds = load_dataset(path, name, **kwargs) if name else load_dataset(path, **kwargs)
@@ -564,6 +569,47 @@ def iter_dolly_prose(max_docs: int) -> Iterable[str]:
                 return
 
 
+def app_doc_from_row(row: dict[str, Any]) -> str:
+    lang = clean_text(row.get("lang") or row.get("language"))
+    if lang and not lang.lower().startswith("en"):
+        return ""
+    name = clean_text(row.get("app_name") or row.get("trackName") or row.get("name") or row.get("title"))
+    category = clean_text(row.get("category") or row.get("app_category") or row.get("primaryGenreName") or row.get("genre"))
+    developer = clean_text(row.get("developer_name") or row.get("artistName") or row.get("developer"))
+    desc = clean_text(row.get("description") or row.get("desc") or row.get("long_description"))
+    if not prose_ok(desc, min_words=30):
+        return ""
+    prefix = []
+    if name:
+        prefix.append(name)
+    if category:
+        prefix.append(f"Category: {category}.")
+    if developer:
+        prefix.append(f"Developer: {developer}.")
+    return clean_text(" ".join(prefix + [desc]))
+
+
+def iter_app_descriptions(max_docs: int) -> Iterable[str]:
+    produced = 0
+    seen: set[str] = set()
+    for dataset_id, kwargs in APP_DESC_DATASETS:
+        try:
+            ds = load_all_splits(dataset_id, **kwargs)
+        except Exception as exc:
+            print(f"WARNING: {dataset_id} unavailable for app descriptions ({type(exc).__name__}: {exc})")
+            continue
+        for row in ds:
+            text = app_doc_from_row(row)
+            sig = prose_signature(text)
+            if not text or not sig or sig in seen:
+                continue
+            seen.add(sig)
+            yield text
+            produced += 1
+            if max_docs > 0 and produced >= max_docs:
+                return
+
+
 def encode_doc_lm(sp: spm.SentencePieceProcessor, text: str, max_seq_len: int) -> Iterable[dict[str, list[int]]]:
     tokens = [2] + sp.encode(clean_text(text), out_type=int) + [3]
     if len(tokens) <= max_seq_len:
@@ -599,6 +645,7 @@ def lm_prose(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: 
     os.makedirs(base, exist_ok=True)
 
     def docs() -> Iterable[str]:
+        yield from iter_app_descriptions(env_int("APP_DESC_MAX_DOCS", 100000))
         yield from iter_msmarco_passages(env_int("MSMARCO_PASSAGE_MAX_DOCS", 300000))
         yield from iter_dolly_prose(env_int("DOLLY_PROSE_MAX_DOCS", 0))
 

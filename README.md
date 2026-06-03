@@ -111,6 +111,8 @@ The packed LM dataset is built from `data/corpus.txt` into:
 - `data/lm_base/train`
 - `data/lm_base/val`
 
+The improved prose LM path also adds app-description sources so the base model sees smartphone and application-domain language before task finetuning. Current public sources include Google Play app metadata from MobileRec and Mac App Store description text. These are used as prose documents, not as scraped live store pages.
+
 Training output goes to:
 
 - `checkpoints/lm_base/`
