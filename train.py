@@ -336,6 +336,7 @@ def main() -> None:
         for epoch in range(start_epoch, args.epochs):
             pbar = tqdm(train_loader, desc=f"stage{args.stage} epoch{epoch + 1}")
             running = 0.0
+            running_batches = 0
             optimizer.zero_grad(set_to_none=True)
             for i, batch in enumerate(pbar):
                 lr = lr_at(global_step, total_steps, args.lr, d["min_lr"], args.warmup_steps)
@@ -348,6 +349,7 @@ def main() -> None:
                     loss = loss / args.grad_accum_steps
                 scaler.scale(loss).backward()
                 running += float(loss.item()) * args.grad_accum_steps
+                running_batches += 1
                 if (i + 1) % args.grad_accum_steps == 0:
                     scaler.unscale_(optimizer)
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
@@ -364,7 +366,7 @@ def main() -> None:
                             "step": global_step,
                             "epoch": epoch + 1,
                             "tokens_seen": global_step * effective_batch_tokens,
-                            "train_loss": running / max(1, d["val_every"]),
+                            "train_loss": running / max(1, running_batches),
                             "val_loss": val,
                             "lr": lr,
                             "timestamp": datetime.utcnow().isoformat(),
@@ -374,6 +376,7 @@ def main() -> None:
                         if run:
                             run.log(row)
                         running = 0.0
+                        running_batches = 0
                         if val < best_val:
                             best_val = val
                             save_checkpoint(os.path.join(args.output_dir, "best.pt"), model, optimizer, scaler, global_step, epoch, best_val, metadata)
