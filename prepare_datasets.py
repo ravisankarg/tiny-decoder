@@ -479,6 +479,108 @@ def lm_base(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: b
     print("=== DONE: prepare_datasets.py ===")
 
 
+def prose_ok(text: str, min_words: int = 40) -> bool:
+    words = clean_text(text).split()
+    if len(words) < min_words:
+        return False
+    alpha = sum(ch.isalpha() for ch in text)
+    return alpha >= max(40, len(text) // 3)
+
+
+def iter_msmarco_passages(max_docs: int) -> Iterable[str]:
+    produced = 0
+    ds = load_all_splits("microsoft/ms_marco", "v1.1").shuffle(seed=42)
+    for row in ds:
+        passages = row.get("passages") or {}
+        texts = passages.get("passage_text") if isinstance(passages, dict) else None
+        if not texts:
+            continue
+        for text in texts:
+            text = clean_text(text)
+            if prose_ok(text):
+                yield text
+                produced += 1
+                if max_docs > 0 and produced >= max_docs:
+                    return
+
+
+def iter_dolly_prose(max_docs: int) -> Iterable[str]:
+    produced = 0
+    ds = load_all_splits("databricks/databricks-dolly-15k")
+    for row in ds:
+        parts = []
+        for key in ["context", "response"]:
+            text = clean_text(row.get(key))
+            if prose_ok(text, min_words=30):
+                parts.append(text)
+        if parts:
+            yield "\n\n".join(parts)
+            produced += 1
+            if max_docs > 0 and produced >= max_docs:
+                return
+
+
+def encode_doc_lm(sp: spm.SentencePieceProcessor, text: str, max_seq_len: int) -> Iterable[dict[str, list[int]]]:
+    tokens = [2] + sp.encode(clean_text(text), out_type=int) + [3]
+    if len(tokens) <= max_seq_len:
+        ids = list(tokens)
+        labels = list(tokens)
+        pad = max_seq_len - len(ids)
+        if pad > 0:
+            ids += [0] * pad
+            labels += [-100] * pad
+        yield {"input_ids": ids, "labels": labels}
+        return
+    start = 0
+    while start < len(tokens) - 1:
+        chunk = tokens[start : start + max_seq_len]
+        if len(chunk) < max_seq_len // 2:
+            break
+        ids = list(chunk)
+        labels = list(chunk)
+        pad = max_seq_len - len(ids)
+        if pad > 0:
+            ids += [0] * pad
+            labels += [-100] * pad
+        yield {"input_ids": ids, "labels": labels}
+        start += max_seq_len
+
+
+def lm_prose(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: bool) -> None:
+    base = os.path.join(output_dir, "lm_prose")
+    if stage1_complete(base) and not overwrite:
+        print(f"{base} exists; skipping")
+        print("=== DONE: prepare_datasets.py ===")
+        return
+    os.makedirs(base, exist_ok=True)
+
+    def docs() -> Iterable[str]:
+        yield from iter_msmarco_passages(env_int("MSMARCO_PASSAGE_MAX_DOCS", 300000))
+        yield from iter_dolly_prose(env_int("DOLLY_PROSE_MAX_DOCS", 0))
+
+    def make_generator(wanted_split: str):
+        def gen():
+            sp = spm.SentencePieceProcessor(model_file=tokenizer_path)
+            for doc_idx, text in enumerate(docs()):
+                split = "val" if doc_idx % 20 == 0 else "train"
+                if split != wanted_split:
+                    continue
+                for row in encode_doc_lm(sp, text, max_seq_len):
+                    yield row
+
+        return gen
+
+    for split in ["train", "val"]:
+        split_dir = os.path.join(base, split)
+        if os.path.exists(split_dir):
+            shutil.rmtree(split_dir)
+        cache_dir = os.path.join(output_dir, ".generator_cache", "lm_prose", split)
+        os.makedirs(cache_dir, exist_ok=True)
+        ds = Dataset.from_generator(make_generator(split), features=lm_features(), keep_in_memory=False, cache_dir=cache_dir)
+        ds.save_to_disk(split_dir)
+    print("=== DONE: prepare_datasets.py ===")
+
+
 def conll_examples() -> list[dict[str, str]]:
     ds = load_all_splits("eriktks/conll2003")
     names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
@@ -760,7 +862,7 @@ def stage3(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: bo
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", choices=["1_text", "1", "lm_base", "2", "3", "all"], required=True)
+    parser.add_argument("--stage", choices=["1_text", "1", "lm_base", "lm_prose", "2", "3", "all"], required=True)
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--tokenizer_path")
     parser.add_argument("--max_seq_len", type=int)
@@ -772,6 +874,8 @@ def main() -> None:
         stage1(args.output_dir, args.tokenizer_path, args.max_seq_len or 256, args.overwrite)
     if args.stage in {"lm_base", "all"}:
         lm_base(args.output_dir, args.tokenizer_path, args.max_seq_len or 256, args.overwrite)
+    if args.stage in {"lm_prose", "all"}:
+        lm_prose(args.output_dir, args.tokenizer_path, args.max_seq_len or 256, args.overwrite)
     if args.stage in {"2", "all"}:
         stage2(args.output_dir, args.tokenizer_path, args.max_seq_len or 512, args.overwrite)
     if args.stage in {"3", "all"}:

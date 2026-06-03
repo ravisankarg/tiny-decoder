@@ -115,7 +115,8 @@ def find_tokenizer(data_dir: str, explicit: str | None) -> str:
 
 def load_train_val(stage: int, data_dir: str, tokenizer_path: str | None, max_seq_len: int):
     if stage == 0:
-        return ArrowTorchDataset(load_from_disk(os.path.join(data_dir, "lm_base", "train"))), [ArrowTorchDataset(load_from_disk(os.path.join(data_dir, "lm_base", "val")))]
+        lm_name = os.environ.get("LM_DATASET_NAME", "lm_prose")
+        return ArrowTorchDataset(load_from_disk(os.path.join(data_dir, lm_name, "train"))), [ArrowTorchDataset(load_from_disk(os.path.join(data_dir, lm_name, "val")))]
     if stage == 1:
         return ArrowTorchDataset(load_from_disk(os.path.join(data_dir, "stage1", "train"))), [ArrowTorchDataset(load_from_disk(os.path.join(data_dir, "stage1", "val")))]
     if stage == 2:
