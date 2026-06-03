@@ -13,6 +13,13 @@ from datasets import Dataset, Features, Image, Sequence, Value, concatenate_data
 from tqdm import tqdm
 
 STOPWORDS = {"the", "a", "an", "of", "in", "on", "at", "for", "to", "and", "or", "is", "was", "it", "its", "this", "that", "with", "from"}
+PROSE_BANNED_PHRASES = {
+    "terms and conditions",
+    "direct debit",
+    "accommodation agreement",
+    "pay a deposit",
+    "private halls",
+}
 DEFAULT_CODE_CORPUS = "/home/ravi/codex/std/data/processed_code_full/train.jsonl"
 DEFAULT_FLICKR_GLOB = "data/flickr/*.parquet"
 SNIPS_ACTION = {
@@ -480,32 +487,64 @@ def lm_base(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: b
 
 
 def prose_ok(text: str, min_words: int = 40) -> bool:
-    words = clean_text(text).split()
+    text = clean_text(text)
+    lowered = text.lower()
+    if sum(phrase in lowered for phrase in PROSE_BANNED_PHRASES) >= 2:
+        return False
+    words = text.split()
     if len(words) < min_words:
+        return False
+    unique_ratio = len(set(w.lower().strip(".,;:!?()[]{}\"'") for w in words)) / max(1, len(words))
+    if unique_ratio < 0.45:
+        return False
+    if max((words.count(w) for w in set(words)), default=0) > max(6, len(words) // 8):
         return False
     alpha = sum(ch.isalpha() for ch in text)
     return alpha >= max(40, len(text) // 3)
 
 
+def prose_signature(text: str) -> str:
+    words = [
+        w.lower().strip(".,;:!?()[]{}\"'")
+        for w in clean_text(text).split()
+        if len(w) > 3 and w.lower() not in STOPWORDS
+    ]
+    return " ".join(words[:32])
+
+
 def iter_msmarco_passages(max_docs: int) -> Iterable[str]:
     produced = 0
+    seen: set[str] = set()
     ds = load_all_splits("microsoft/ms_marco", "v1.1").shuffle(seed=42)
     for row in ds:
+        query = clean_text(row.get("query")).lower()
         passages = row.get("passages") or {}
         texts = passages.get("passage_text") if isinstance(passages, dict) else None
         if not texts:
             continue
+        yielded_for_query = False
         for text in texts:
+            if yielded_for_query:
+                break
             text = clean_text(text)
-            if prose_ok(text):
-                yield text
-                produced += 1
-                if max_docs > 0 and produced >= max_docs:
-                    return
+            sig = prose_signature(text)
+            if not sig or sig in seen:
+                continue
+            if query and query in text.lower() and len(text.split()) < 80:
+                continue
+            if not prose_ok(text):
+                continue
+            seen.add(sig)
+            yield text
+            yielded_for_query = True
+            produced += 1
+            if max_docs > 0 and produced >= max_docs:
+                return
 
 
 def iter_dolly_prose(max_docs: int) -> Iterable[str]:
     produced = 0
+    seen: set[str] = set()
     ds = load_all_splits("databricks/databricks-dolly-15k")
     for row in ds:
         parts = []
@@ -514,7 +553,12 @@ def iter_dolly_prose(max_docs: int) -> Iterable[str]:
             if prose_ok(text, min_words=30):
                 parts.append(text)
         if parts:
-            yield "\n\n".join(parts)
+            text = "\n\n".join(parts)
+            sig = prose_signature(text)
+            if not sig or sig in seen:
+                continue
+            seen.add(sig)
+            yield text
             produced += 1
             if max_docs > 0 and produced >= max_docs:
                 return
