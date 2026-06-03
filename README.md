@@ -137,12 +137,12 @@ Each experiment stores:
 
 The LM experiment launcher chooses physical batch size from model size so smaller models use more of the available GPU memory. Gradient accumulation is adjusted to keep the effective tokens per update close across runs:
 
-- ~9M params: batch 32, accumulation 2
-- ~20M params: batch 16, accumulation 4
-- ~31M params: batch 10, accumulation 6
-- ~40M params: batch 8, accumulation 8
+- ~9M params: batch 56, accumulation 1
+- ~20M params: batch 32, accumulation 2
+- ~31M params: batch 13, accumulation 5
+- ~40M params: batch 7, accumulation 9
 
-These defaults target a 4 GB laptop GPU with FP16 and gradient checkpointing. They can be overridden with `LM_BATCH_SIZE` and `LM_GRAD_ACCUM_STEPS` when a specific GPU has more or less usable memory.
+These defaults were calibrated on a 4 GB RTX 3050 Laptop GPU with FP16 and gradient checkpointing. They can be overridden with `LM_BATCH_SIZE` and `LM_GRAD_ACCUM_STEPS` when a specific GPU has more or less usable memory.
 
 ## What Must Pass Before Task Training
 
