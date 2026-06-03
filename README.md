@@ -137,7 +137,7 @@ Each experiment stores:
 
 The LM experiment launcher chooses physical batch size from model size so smaller models use more of the available GPU memory. Gradient accumulation is adjusted to keep the effective tokens per update close across runs:
 
-- ~9M params: batch 56, accumulation 1
+- ~9M params: batch 48, accumulation 1
 - ~20M params: batch 32, accumulation 2
 - ~31M params: batch 13, accumulation 5
 - ~40M params: batch 7, accumulation 9

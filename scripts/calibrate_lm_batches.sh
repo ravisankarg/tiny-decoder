@@ -8,7 +8,7 @@ export PYTHONUNBUFFERED=1
 export LM_DATASET_NAME="${LM_DATASET_NAME:-lm_prose}"
 
 configs=(
-  "model_config_10m.json:lm_10m:48 52 56 60 64"
+  "model_config_10m.json:lm_10m:40 44 48 52 56"
   "model_config.json:lm_20m:24 28 32 36 40"
   "model_config_30m.json:lm_30m:10 12 13 14 16"
   "model_config_40m.json:lm_40m:4 6 7 8 10"

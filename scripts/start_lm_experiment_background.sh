@@ -31,7 +31,7 @@ PY
 
 if [[ -z "${LM_BATCH_SIZE:-}" || -z "${LM_GRAD_ACCUM_STEPS:-}" ]]; then
   if (( param_count <= 9000000 )); then
-    auto_batch_size=56
+    auto_batch_size=48
     auto_grad_accum_steps=1
   elif (( param_count <= 21000000 )); then
     auto_batch_size=32

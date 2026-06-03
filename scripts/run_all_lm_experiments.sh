@@ -13,6 +13,10 @@ run_one() {
   while ps -p "$pid" > /dev/null 2>&1; do
     sleep 60
   done
+  if ! tail -n 20 "logs/${experiment}.out" | grep -q "=== DONE: train.py ==="; then
+    echo "ERROR: ${experiment} did not finish cleanly. See logs/${experiment}.out" >&2
+    exit 1
+  fi
   echo "== finished ${experiment} =="
 }
 
