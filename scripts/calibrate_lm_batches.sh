@@ -8,10 +8,10 @@ export PYTHONUNBUFFERED=1
 export LM_DATASET_NAME="${LM_DATASET_NAME:-lm_prose}"
 
 configs=(
-  "model_config_10m.json:lm_10m:40 44 48 52 56"
-  "model_config.json:lm_20m:24 28 32 36 40"
-  "model_config_30m.json:lm_30m:10 12 13 14 16"
-  "model_config_40m.json:lm_40m:4 6 7 8 10"
+  "model_config_10m.json:lm_10m:24 28 32 36 40"
+  "model_config.json:lm_20m:12 14 16 18 20"
+  "model_config_30m.json:lm_30m:6 8 10 12"
+  "model_config_40m.json:lm_40m:2 4 6"
 )
 
 mkdir -p logs/batch_calibration /tmp/tiny_decoder_batch_probe
@@ -41,7 +41,7 @@ for item in "${configs[@]}"; do
       --require_cuda \
       --no_compile \
       --overwrite \
-      --max_steps "${LM_CALIBRATE_STEPS:-2}" \
+      --max_steps "${LM_CALIBRATE_STEPS:-20}" \
       > "$log_path" 2>&1; then
       best="$batch"
       echo "ok batch_size=${batch}"
