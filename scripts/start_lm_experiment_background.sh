@@ -31,17 +31,17 @@ PY
 
 if [[ -z "${LM_BATCH_SIZE:-}" || -z "${LM_GRAD_ACCUM_STEPS:-}" ]]; then
   if (( param_count <= 9000000 )); then
-    auto_batch_size=64
-    auto_grad_accum_steps=1
-  elif (( param_count <= 21000000 )); then
     auto_batch_size=32
     auto_grad_accum_steps=2
-  elif (( param_count <= 32000000 )); then
-    auto_batch_size=20
-    auto_grad_accum_steps=3
-  else
+  elif (( param_count <= 21000000 )); then
     auto_batch_size=16
     auto_grad_accum_steps=4
+  elif (( param_count <= 32000000 )); then
+    auto_batch_size=10
+    auto_grad_accum_steps=6
+  else
+    auto_batch_size=8
+    auto_grad_accum_steps=8
   fi
 fi
 
