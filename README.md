@@ -116,44 +116,6 @@ Training output goes to:
 - `checkpoints/lm_base/`
 - `logs/lm_base.out`
 
-## How To Check LM Dataset Prep
-
-Check whether dataset prep is still running:
-
-```bash
-pgrep -af 'prepare_datasets.py.*lm_base'
-```
-
-Check whether the dataset is complete:
-
-```bash
-python - <<'PY'
-from datasets import load_from_disk
-print("train", len(load_from_disk("data/lm_base/train")))
-print("val", len(load_from_disk("data/lm_base/val")))
-PY
-```
-
-If that prints train and val counts without error, the packed LM dataset is ready.
-
-## Start Base LM Training
-
-```bash
-scripts/start_lm_base_background.sh --overwrite
-```
-
-Monitor training:
-
-```bash
-tail -f logs/lm_base.out
-```
-
-Watch CSV metrics:
-
-```bash
-tail -f checkpoints/lm_base/training_log.csv
-```
-
 ## What Must Pass Before Task Training
 
 Before adding OCR/instruction/autocomplete again, the base LM should produce at least somewhat coherent continuations for prompts like:
