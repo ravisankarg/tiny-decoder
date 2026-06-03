@@ -1,0 +1,36 @@
+# Python/runtime
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local virtual environments
+venv/
+.venv/
+.smoke_venv/
+
+# Generated datasets and caches
+data/
+*.arrow
+*.parquet
+
+# Training outputs
+checkpoints/
+logs/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Local/editor files
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+
+# Optional experiment outputs
+wandb/
+runs/
+outputs/

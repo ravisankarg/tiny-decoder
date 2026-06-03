@@ -1,0 +1,12 @@
+torch==2.2.0
+sentencepiece==0.2.0
+datasets==2.18.0
+transformers==4.39.0
+numpy==1.26.4
+tqdm==4.66.2
+wandb==0.16.6
+safetensors==0.4.3
+gradio==4.44.1
+fastapi==0.112.4
+starlette==0.38.6
+pydantic==2.9.2
