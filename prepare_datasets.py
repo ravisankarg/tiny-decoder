@@ -56,6 +56,13 @@ def env_int(name: str, default: int) -> int:
     return int(raw)
 
 
+def env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def write_corpus_line(handle, text: Any) -> bool:
     line = clean_text(text)
     if not line:
@@ -104,8 +111,8 @@ def iter_flickr_texts(pattern: str, max_rows: int) -> Iterable[str]:
 
 def lm_features() -> Features:
     return Features({
-        "input_ids": Sequence(Value("int64")),
-        "labels": Sequence(Value("int64")),
+        "input_ids": Sequence(Value("int32")),
+        "labels": Sequence(Value("int32")),
     })
 
 
@@ -286,8 +293,8 @@ def encode_pair(sp: spm.SentencePieceProcessor, input_text: str, output_text: st
 
 def pair_features() -> Features:
     return Features({
-        "input_ids": Sequence(Value("int64")),
-        "labels": Sequence(Value("int64")),
+        "input_ids": Sequence(Value("int32")),
+        "labels": Sequence(Value("int32")),
         "input_text": Value("string"),
         "target_text": Value("string"),
     })
@@ -569,6 +576,54 @@ def iter_dolly_prose(max_docs: int) -> Iterable[str]:
                 return
 
 
+def iter_wikipedia_prose(max_docs: int) -> Iterable[str]:
+    produced = 0
+    seen: set[str] = set()
+    config = os.environ.get("WIKIPEDIA_CONFIG", "20231101.en")
+    try:
+        ds = load_dataset("wikimedia/wikipedia", config, split="train", streaming=True)
+    except Exception as exc:
+        print(f"WARNING: wikimedia/wikipedia unavailable for LM prose ({type(exc).__name__}: {exc})")
+        return
+    for row in ds:
+        title = clean_text(row.get("title"))
+        body = clean_text(row.get("text"))
+        if not prose_ok(body, min_words=80):
+            continue
+        text = clean_text((title + ". " if title else "") + body)
+        sig = prose_signature(text)
+        if not sig or sig in seen:
+            continue
+        seen.add(sig)
+        yield text
+        produced += 1
+        if max_docs > 0 and produced >= max_docs:
+            return
+
+
+def iter_fineweb_edu_prose(max_docs: int) -> Iterable[str]:
+    produced = 0
+    seen: set[str] = set()
+    config = os.environ.get("FINEWEB_EDU_CONFIG", "sample-10BT")
+    try:
+        ds = load_dataset("HuggingFaceFW/fineweb-edu", config, split="train", streaming=True)
+    except Exception as exc:
+        print(f"WARNING: HuggingFaceFW/fineweb-edu unavailable for LM prose ({type(exc).__name__}: {exc})")
+        return
+    for row in ds:
+        text = clean_text(row.get("text"))
+        if not prose_ok(text, min_words=80):
+            continue
+        sig = prose_signature(text)
+        if not sig or sig in seen:
+            continue
+        seen.add(sig)
+        yield text
+        produced += 1
+        if max_docs > 0 and produced >= max_docs:
+            return
+
+
 def app_doc_from_row(row: dict[str, Any]) -> str:
     lang = clean_text(row.get("lang") or row.get("language"))
     if lang and not lang.lower().startswith("en"):
@@ -645,9 +700,33 @@ def lm_prose(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: 
     os.makedirs(base, exist_ok=True)
 
     def docs() -> Iterable[str]:
-        yield from iter_app_descriptions(env_int("APP_DESC_MAX_DOCS", 100000))
-        yield from iter_msmarco_passages(env_int("MSMARCO_PASSAGE_MAX_DOCS", 300000))
-        yield from iter_dolly_prose(env_int("DOLLY_PROSE_MAX_DOCS", 0))
+        target_tokens = env_int("LM_PROSE_TARGET_TOKENS", 0)
+        produced_tokens = 0
+        sources: list[tuple[str, Iterable[str]]] = []
+        if env_bool("ENABLE_APP_DESC", True):
+            sources.append(("app_descriptions", iter_app_descriptions(env_int("APP_DESC_MAX_DOCS", 100000))))
+        if env_bool("ENABLE_WIKIPEDIA", False):
+            sources.append(("wikipedia", iter_wikipedia_prose(env_int("WIKIPEDIA_MAX_DOCS", 0))))
+        if env_bool("ENABLE_FINEWEB_EDU", False):
+            sources.append(("fineweb_edu", iter_fineweb_edu_prose(env_int("FINEWEB_EDU_MAX_DOCS", 0))))
+        if env_bool("ENABLE_MSMARCO_PASSAGES", True):
+            sources.append(("msmarco_passages", iter_msmarco_passages(env_int("MSMARCO_PASSAGE_MAX_DOCS", 300000))))
+        if env_bool("ENABLE_DOLLY_PROSE", True):
+            sources.append(("dolly_prose", iter_dolly_prose(env_int("DOLLY_PROSE_MAX_DOCS", 0))))
+
+        for source, rows in sources:
+            source_docs = 0
+            source_tokens = 0
+            for text in rows:
+                approx_tokens = max(1, int(len(clean_text(text).split()) * 1.35))
+                if target_tokens > 0 and produced_tokens >= target_tokens:
+                    print(f"LM_PROSE_TARGET_TOKENS reached: approx_tokens={produced_tokens}")
+                    return
+                produced_tokens += approx_tokens
+                source_docs += 1
+                source_tokens += approx_tokens
+                yield text
+            print(f"source_done={source} docs={source_docs} approx_tokens={source_tokens}")
 
     def make_generator(wanted_split: str):
         def gen():

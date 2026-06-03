@@ -124,6 +124,19 @@ The packed LM dataset is built from `data/corpus.txt` into:
 
 The improved prose LM path also adds app-description sources so the base model sees smartphone and application-domain language before task finetuning. Current public sources include Google Play app metadata from MobileRec and Mac App Store description text. These are used as prose documents, not as scraped live store pages.
 
+The first model-size comparison used about 123M tokens seen over three epochs. That was useful for debugging, but it is still small for judging whether 10M, 20M, 30M, and 40M parameter decoders can learn useful language. The next corpus target is roughly 1B tokens while keeping the same document-style LM format.
+
+The expanded prose corpus can stream additional public text from:
+
+- Wikimedia English Wikipedia
+- FineWeb-Edu sample text
+- app-description sources already used for smartphone/application-domain prose
+- MS MARCO passages and Dolly prose snippets
+
+The wrapper for this larger corpus is:
+
+- `scripts/prepare_lm_prose_1b.sh`
+
 Training output goes to:
 
 - `checkpoints/<experiment_name>/`
