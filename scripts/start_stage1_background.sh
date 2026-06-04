@@ -4,15 +4,28 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source venv/bin/activate
 
-mkdir -p logs checkpoints/stage1
-
 export PYTHONUNBUFFERED=1
 
+overwrite=0
+for arg in "$@"; do
+  if [[ "$arg" == "--overwrite" ]]; then
+    overwrite=1
+  fi
+done
+
+if (( overwrite == 1 )); then
+  rm -rf checkpoints/stage1
+  rm -f logs/stage1.out logs/stage1.pid
+fi
+mkdir -p logs checkpoints/stage1
+
 checkpoint_args=()
-if [[ -f checkpoints/stage1/latest.pt ]]; then
-  checkpoint_args=(--checkpoint checkpoints/stage1/latest.pt)
-elif [[ -f checkpoints/stage1/best.pt ]]; then
-  checkpoint_args=(--checkpoint checkpoints/stage1/best.pt)
+if (( overwrite == 0 )); then
+  if [[ -f checkpoints/stage1/latest.pt ]]; then
+    checkpoint_args=(--checkpoint checkpoints/stage1/latest.pt)
+  elif [[ -f checkpoints/stage1/best.pt ]]; then
+    checkpoint_args=(--checkpoint checkpoints/stage1/best.pt)
+  fi
 fi
 
 nohup python train.py \

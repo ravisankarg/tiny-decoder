@@ -4,9 +4,20 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source venv/bin/activate
 
-mkdir -p logs checkpoints/stage2
-
 export PYTHONUNBUFFERED=1
+
+overwrite=0
+for arg in "$@"; do
+  if [[ "$arg" == "--overwrite" ]]; then
+    overwrite=1
+  fi
+done
+
+if (( overwrite == 1 )); then
+  rm -rf checkpoints/stage2
+  rm -f logs/stage2.out logs/stage2.pid
+fi
+mkdir -p logs checkpoints/stage2
 
 nohup python train.py \
   --stage 2 \

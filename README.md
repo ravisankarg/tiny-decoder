@@ -198,6 +198,8 @@ These defaults are intentionally conservative for a 4 GB RTX 3050 Laptop GPU wit
 
 Training launchers default to `--precision bf16` because BF16 uses the same 16-bit activation memory as FP16 but has a wider exponent range and usually does not need gradient scaling. If a GPU does not support BF16, use `TRAIN_PRECISION=fp16` or `LM_PRECISION=fp16` as a fallback.
 
+For ablation runs, `--overwrite` means a fresh run. The launcher clears the same-name checkpoint/log output before starting and does not resume `latest.pt` or `best.pt`. Without `--overwrite`, it will resume an existing same-name checkpoint when available.
+
 ## First Ablation Results
 
 The first controlled comparison used the same `lm_prose` dataset, 3 epochs, 7,500 training steps, 122.88M cumulative token slots processed, and 16,384 effective tokens per optimizer update for all four model sizes.

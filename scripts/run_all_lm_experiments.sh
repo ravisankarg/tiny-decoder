@@ -3,10 +3,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+export LM_PRECISION="${LM_PRECISION:-bf16}"
+
 run_one() {
   local config="$1"
   local experiment="$2"
-  echo "== starting ${experiment} =="
+  echo "== starting ${experiment} from scratch (${LM_PRECISION}) =="
   scripts/start_lm_experiment_background.sh "$config" "$experiment" --overwrite
   local pid
   pid="$(cat "logs/${experiment}.pid")"

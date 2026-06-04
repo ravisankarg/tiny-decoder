@@ -14,7 +14,12 @@ if [[ -z "$config_path" || -z "$experiment_name" ]]; then
   exit 2
 fi
 
-mkdir -p logs "checkpoints/${experiment_name}"
+overwrite=0
+for arg in "$@"; do
+  if [[ "$arg" == "--overwrite" ]]; then
+    overwrite=1
+  fi
+done
 
 export PYTHONUNBUFFERED=1
 export LM_DATASET_NAME="${LM_DATASET_NAME:-lm_prose}"
@@ -51,10 +56,12 @@ precision="${LM_PRECISION:-${TRAIN_PRECISION:-bf16}}"
 effective_tokens=$((batch_size * grad_accum_steps * 256))
 
 checkpoint_args=()
-if [[ -f "checkpoints/${experiment_name}/latest.pt" ]]; then
-  checkpoint_args=(--checkpoint "checkpoints/${experiment_name}/latest.pt")
-elif [[ -f "checkpoints/${experiment_name}/best.pt" ]]; then
-  checkpoint_args=(--checkpoint "checkpoints/${experiment_name}/best.pt")
+if (( overwrite == 0 )); then
+  if [[ -f "checkpoints/${experiment_name}/latest.pt" ]]; then
+    checkpoint_args=(--checkpoint "checkpoints/${experiment_name}/latest.pt")
+  elif [[ -f "checkpoints/${experiment_name}/best.pt" ]]; then
+    checkpoint_args=(--checkpoint "checkpoints/${experiment_name}/best.pt")
+  fi
 fi
 
 if [[ "${LM_DRY_RUN:-0}" == "1" ]]; then
@@ -68,6 +75,12 @@ if [[ "${LM_DRY_RUN:-0}" == "1" ]]; then
   echo "effective_tokens_per_update: ${effective_tokens}"
   exit 0
 fi
+
+if (( overwrite == 1 )); then
+  rm -rf "checkpoints/${experiment_name}"
+  rm -f "logs/${experiment_name}.out" "logs/${experiment_name}.pid"
+fi
+mkdir -p logs "checkpoints/${experiment_name}"
 
 nohup python train.py \
   --stage 0 \
