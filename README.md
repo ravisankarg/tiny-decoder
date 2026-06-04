@@ -17,13 +17,31 @@ To make that comparison meaningful, each model-size run should keep these fixed:
 - same tokenizer
 - same LM dataset
 - same sequence length
-- same number of epochs or tokens seen
+- same cumulative tokens seen or same number of epochs
 - same validation split
 - same learning-rate schedule
 - same effective tokens per optimizer update
 - same GPU class and mixed-precision settings
 
 Only the model config and the physical batch/accumulation split should change. The physical batch size changes because larger models need more VRAM, but gradient accumulation is adjusted to keep the effective token budget per update constant.
+
+## Token Accounting
+
+This repo reports **tokens seen** as the cumulative training token slots processed by the optimizer.
+
+For example:
+
+```text
+tokens seen = training steps * effective tokens per update
+```
+
+This is different from dataset size. If a train split has 40M token slots and the model trains for 3 epochs, the training run has seen about 120M token slots. That cumulative number is the usual number to report when describing how many tokens a model was trained on.
+
+When needed, the README distinguishes:
+
+- **dataset size**: token slots available in the train split
+- **tokens seen**: cumulative token slots processed during training
+- **epochs**: how many passes through the train split produced that token budget
 
 ## Current Direction
 
@@ -145,7 +163,7 @@ The packed LM dataset is built from `data/corpus.txt` into:
 
 The improved prose LM path also adds app-description sources so the base model sees smartphone and application-domain language before task finetuning. Current public sources include Google Play app metadata from MobileRec and Mac App Store description text. These are used as prose documents, not as scraped live store pages.
 
-The first model-size comparison used about 123M tokens seen over three epochs. That was useful for debugging, but it is still small for judging whether 10M, 20M, 30M, and 40M parameter decoders can learn useful language. The next corpus target is roughly 1B tokens while keeping the same document-style LM format.
+The first model-size comparison processed about 123M cumulative training token slots over three epochs. That was useful for debugging, but it is still small for judging whether 10M, 20M, 30M, and 40M parameter decoders can learn useful language. The next train-split target is roughly 1B token slots while keeping the same document-style LM format.
 
 The expanded prose corpus can stream additional public text from:
 
@@ -180,7 +198,7 @@ These defaults are intentionally conservative for a 4 GB RTX 3050 Laptop GPU wit
 
 ## First Ablation Results
 
-The first controlled comparison used the same `lm_prose` dataset, 3 epochs, 7,500 training steps, 122.88M tokens seen, and 16,384 effective tokens per optimizer update for all four model sizes.
+The first controlled comparison used the same `lm_prose` dataset, 3 epochs, 7,500 training steps, 122.88M cumulative token slots processed, and 16,384 effective tokens per optimizer update for all four model sizes.
 
 ![Validation loss vs tokens seen](docs/plots/lm_val_loss_vs_tokens.png)
 
@@ -204,13 +222,13 @@ The validation loss improved steadily as parameter count increased. This is the 
 
 Technical notes from this result:
 
-- 122.88M tokens seen is too small to judge final tiny-LM capability.
+- 122.88M cumulative token slots processed is too small to judge final tiny-LM capability.
 - The larger models benefited from capacity even under the same token budget.
 - The 40M model reached the best validation loss, but it trained about 3.6x slower than the 10M model on the same 4 GB RTX 3050 Laptop GPU.
 - The 10M model saw the most tokens per parameter but still had the worst validation loss, so token-per-parameter alone did not compensate for limited capacity in this setup.
-- All four curves were still descending at the end of 3 epochs, especially the larger models, which suggests the 122.88M-token run was undertrained.
+- All four curves were still descending at the end of 3 epochs, especially the larger models, which suggests the 122.88M-token-slot run was undertrained.
 - The train-loss column from this run was not a reliable cross-model comparison because the logging denominator was fixed after this run; validation loss is the cleaner signal.
-- The next dataset target is around 1B tokens so the same ablation can be repeated at a more meaningful scale.
+- The next train-split target is around 1B token slots so the same ablation can be repeated at a more meaningful scale.
 
 Plots can be regenerated from local checkpoint CSVs with:
 
