@@ -182,6 +182,10 @@ These defaults are intentionally conservative for a 4 GB RTX 3050 Laptop GPU wit
 
 The first controlled comparison used the same `lm_prose` dataset, 3 epochs, 7,500 training steps, 122.88M tokens seen, and 16,384 effective tokens per optimizer update for all four model sizes.
 
+![Validation loss vs tokens seen](docs/plots/lm_val_loss_vs_tokens.png)
+
+![Validation loss vs epoch](docs/plots/lm_val_loss_vs_epoch.png)
+
 | Experiment | Parameters | Batch | Accum | Tokens/update | Steps | Tokens seen | Validation loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `lm_10m` | 8,835,072 | 32 | 2 | 16,384 | 7,500 | 122,880,000 | 4.2634 |
@@ -189,14 +193,30 @@ The first controlled comparison used the same `lm_prose` dataset, 3 epochs, 7,50
 | `lm_30m` | 31,311,616 | 8 | 8 | 16,384 | 7,500 | 122,880,000 | 3.7632 |
 | `lm_40m` | 39,716,864 | 4 | 16 | 16,384 | 7,500 | 122,880,000 | 3.6499 |
 
+| Experiment | First val loss | Final val loss | Loss drop | Tokens/param | Train minutes | Tokens/sec |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `lm_10m` | 7.1565 | 4.2634 | 2.8930 | 13.91 | 43.4 | 47,202 |
+| `lm_20m` | 6.7263 | 3.9137 | 2.8126 | 6.04 | 84.9 | 24,126 |
+| `lm_30m` | 6.5595 | 3.7632 | 2.7963 | 3.92 | 130.1 | 15,744 |
+| `lm_40m` | 6.4547 | 3.6499 | 2.8049 | 3.09 | 156.0 | 13,127 |
+
 The validation loss improved steadily as parameter count increased. This is the expected direction and suggests that the ablation setup is useful. However, generated text was still weak, so this run should be treated as a pipeline baseline, not a solved base model.
 
 Technical notes from this result:
 
 - 122.88M tokens seen is too small to judge final tiny-LM capability.
 - The larger models benefited from capacity even under the same token budget.
+- The 40M model reached the best validation loss, but it trained about 3.6x slower than the 10M model on the same 4 GB RTX 3050 Laptop GPU.
+- The 10M model saw the most tokens per parameter but still had the worst validation loss, so token-per-parameter alone did not compensate for limited capacity in this setup.
+- All four curves were still descending at the end of 3 epochs, especially the larger models, which suggests the 122.88M-token run was undertrained.
 - The train-loss column from this run was not a reliable cross-model comparison because the logging denominator was fixed after this run; validation loss is the cleaner signal.
 - The next dataset target is around 1B tokens so the same ablation can be repeated at a more meaningful scale.
+
+Plots can be regenerated from local checkpoint CSVs with:
+
+```bash
+venv/bin/python scripts/plot_lm_ablation.py
+```
 
 ## What Must Pass Before Task Training
 
