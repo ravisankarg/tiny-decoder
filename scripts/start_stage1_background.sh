@@ -23,7 +23,7 @@ nohup python train.py \
   "${checkpoint_args[@]}" \
   --batch_size 32 \
   --grad_accum_steps 1 \
-  --fp16 \
+  --precision "${TRAIN_PRECISION:-bf16}" \
   --require_cuda \
   "$@" \
   > logs/stage1.out 2>&1 &

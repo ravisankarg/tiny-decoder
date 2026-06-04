@@ -163,8 +163,25 @@ def lr_at(step: int, total_steps: int, base_lr: float, min_lr: float, warmup: in
     return min_lr + 0.5 * (base_lr - min_lr) * (1.0 + math.cos(math.pi * progress))
 
 
+def resolve_precision(args, device: torch.device) -> str:
+    precision = args.precision or ("fp16" if args.fp16 else "fp32")
+    if precision == "bf16" and device.type == "cuda" and not torch.cuda.is_bf16_supported():
+        raise RuntimeError("BF16 precision was requested, but torch.cuda.is_bf16_supported() is False.")
+    if precision in {"bf16", "fp16"} and device.type != "cuda":
+        print(f"WARNING: {precision} requested without CUDA; falling back to fp32")
+        return "fp32"
+    return precision
+
+
+def autocast_kwargs(device: torch.device, precision: str) -> dict[str, object]:
+    if device.type != "cuda" or precision == "fp32":
+        return {"enabled": False}
+    dtype = torch.bfloat16 if precision == "bf16" else torch.float16
+    return {"enabled": True, "dtype": dtype}
+
+
 @torch.no_grad()
-def validate(model, loaders, device, fp16: bool, label_smoothing: float) -> float:
+def validate(model, loaders, device, precision: str, label_smoothing: float) -> float:
     model.eval()
     losses = []
     for loader in loaders:
@@ -172,7 +189,7 @@ def validate(model, loaders, device, fp16: bool, label_smoothing: float) -> floa
         for batch in loader:
             ids = batch["input_ids"].to(device)
             labels = batch["labels"].to(device)
-            with torch.cuda.amp.autocast(enabled=fp16 and device.type == "cuda"):
+            with torch.cuda.amp.autocast(**autocast_kwargs(device, precision)):
                 _, loss = model(ids, labels=labels, checkpoint_blocks=False, label_smoothing=label_smoothing)
             local.append(float(loss.item()))
             if len(local) >= 50:
@@ -220,7 +237,8 @@ def main() -> None:
     p.add_argument("--lr", type=float)
     p.add_argument("--warmup_steps", type=int)
     p.add_argument("--max_seq_len", type=int)
-    p.add_argument("--fp16", action="store_true")
+    p.add_argument("--precision", choices=["fp32", "fp16", "bf16"], help="Training precision. Prefer bf16 on GPUs that support it.")
+    p.add_argument("--fp16", action="store_true", help="Deprecated alias for --precision fp16.")
     p.add_argument("--grad_clip", type=float, default=1.0)
     p.add_argument("--overwrite", action="store_true")
     p.add_argument("--max_steps", type=int, help="Stop after this many optimizer steps; useful for smoke tests.")
@@ -252,9 +270,11 @@ def main() -> None:
     print(f"device={device}")
     if device.type == "cuda":
         print(f"cuda_device={torch.cuda.get_device_name(0)}")
+    precision = resolve_precision(args, device)
+    print(f"precision={precision}")
     model = TinyDecoder(config).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), eps=1e-8, weight_decay=d["weight_decay"])
-    scaler = torch.cuda.amp.GradScaler(enabled=args.fp16 and device.type == "cuda")
+    scaler = torch.cuda.amp.GradScaler(enabled=precision == "fp16" and device.type == "cuda")
     global_step, start_epoch, best_val = 0, 0, float("inf")
 
     if args.checkpoint:
@@ -298,7 +318,9 @@ def main() -> None:
         "warmup_steps": args.warmup_steps,
         "weight_decay": d["weight_decay"],
         "label_smoothing": d["label_smoothing"],
-        "fp16": bool(args.fp16),
+        "precision": precision,
+        "fp16": precision == "fp16",
+        "bf16": precision == "bf16",
         "max_steps": args.max_steps,
         "dataset": dataset_fingerprint(args.data_dir, args.stage),
         "created_at": datetime.utcnow().isoformat(),
@@ -344,7 +366,7 @@ def main() -> None:
                     group["lr"] = lr
                 ids = batch["input_ids"].to(device)
                 labels = batch["labels"].to(device)
-                with torch.cuda.amp.autocast(enabled=args.fp16 and device.type == "cuda"):
+                with torch.cuda.amp.autocast(**autocast_kwargs(device, precision)):
                     _, loss = model(ids, labels=labels, checkpoint_blocks=True, label_smoothing=d["label_smoothing"])
                     loss = loss / args.grad_accum_steps
                 scaler.scale(loss).backward()
@@ -358,7 +380,7 @@ def main() -> None:
                     optimizer.zero_grad(set_to_none=True)
                     global_step += 1
                     if global_step % d["val_every"] == 0:
-                        val = validate(model, val_loaders, device, args.fp16, d["label_smoothing"])
+                        val = validate(model, val_loaders, device, precision, d["label_smoothing"])
                         row = {
                             "experiment_name": metadata["experiment_name"],
                             "param_count": param_count,

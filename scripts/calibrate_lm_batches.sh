@@ -37,7 +37,7 @@ for item in "${configs[@]}"; do
       --grad_accum_steps 1 \
       --lr 2e-4 \
       --warmup_steps 10 \
-      --fp16 \
+      --precision "${LM_PRECISION:-${TRAIN_PRECISION:-bf16}}" \
       --require_cuda \
       --no_compile \
       --overwrite \

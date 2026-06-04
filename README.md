@@ -194,7 +194,9 @@ The LM experiment launcher chooses physical batch size from model size so smalle
 - ~31M params: batch 8, accumulation 8
 - ~40M params: batch 4, accumulation 16
 
-These defaults are intentionally conservative for a 4 GB RTX 3050 Laptop GPU with FP16 and gradient checkpointing. They can be overridden with `LM_BATCH_SIZE` and `LM_GRAD_ACCUM_STEPS` when a specific GPU has more or less usable memory.
+These defaults are intentionally conservative for a 4 GB RTX 3050 Laptop GPU with BF16 mixed precision and gradient checkpointing. They can be overridden with `LM_BATCH_SIZE` and `LM_GRAD_ACCUM_STEPS` when a specific GPU has more or less usable memory.
+
+Training launchers default to `--precision bf16` because BF16 uses the same 16-bit activation memory as FP16 but has a wider exponent range and usually does not need gradient scaling. If a GPU does not support BF16, use `TRAIN_PRECISION=fp16` or `LM_PRECISION=fp16` as a fallback.
 
 ## First Ablation Results
 

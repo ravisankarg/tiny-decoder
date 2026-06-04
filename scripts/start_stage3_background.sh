@@ -16,7 +16,7 @@ nohup python train.py \
   --checkpoint checkpoints/stage2/best.pt \
   --reset_optimizer_state \
   --tokenizer_path tokenizer/tokenizer.model \
-  --fp16 \
+  --precision "${TRAIN_PRECISION:-bf16}" \
   --require_cuda \
   --no_compile \
   "$@" \

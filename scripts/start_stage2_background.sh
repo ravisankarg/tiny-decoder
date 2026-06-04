@@ -17,7 +17,7 @@ nohup python train.py \
   --reset_optimizer_state \
   --batch_size 16 \
   --grad_accum_steps 1 \
-  --fp16 \
+  --precision "${TRAIN_PRECISION:-bf16}" \
   --require_cuda \
   --no_compile \
   "$@" \

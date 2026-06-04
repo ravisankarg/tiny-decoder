@@ -47,6 +47,7 @@ fi
 
 batch_size="${LM_BATCH_SIZE:-$auto_batch_size}"
 grad_accum_steps="${LM_GRAD_ACCUM_STEPS:-$auto_grad_accum_steps}"
+precision="${LM_PRECISION:-${TRAIN_PRECISION:-bf16}}"
 effective_tokens=$((batch_size * grad_accum_steps * 256))
 
 checkpoint_args=()
@@ -63,6 +64,7 @@ if [[ "${LM_DRY_RUN:-0}" == "1" ]]; then
   echo "dataset: ${LM_DATASET_NAME}"
   echo "batch_size: ${batch_size}"
   echo "grad_accum_steps: ${grad_accum_steps}"
+  echo "precision: ${precision}"
   echo "effective_tokens_per_update: ${effective_tokens}"
   exit 0
 fi
@@ -79,7 +81,7 @@ nohup python train.py \
   --grad_accum_steps "$grad_accum_steps" \
   --lr "${LM_LR:-2e-4}" \
   --warmup_steps "${LM_WARMUP_STEPS:-1000}" \
-  --fp16 \
+  --precision "$precision" \
   --require_cuda \
   --no_compile \
   "$@" \
@@ -90,6 +92,7 @@ echo "started ${experiment_name} pid=$(cat "logs/${experiment_name}.pid")"
 echo "params: ${param_count}"
 echo "batch_size: ${batch_size}"
 echo "grad_accum_steps: ${grad_accum_steps}"
+echo "precision: ${precision}"
 echo "effective_tokens_per_update: ${effective_tokens}"
 echo "log: logs/${experiment_name}.out"
 echo "csv: checkpoints/${experiment_name}/training_log.csv"
