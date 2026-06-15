@@ -63,12 +63,23 @@ def env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    return float(raw)
+
+
 def write_corpus_line(handle, text: Any) -> bool:
     line = clean_text(text)
     if not line:
         return False
     handle.write(line.replace("\n", " ") + "\n")
     return True
+
+
+def approx_token_count(text: str) -> int:
+    return max(1, int(len(clean_text(text).split()) * 1.35))
 
 
 def iter_user_message_texts(path: str, max_rows: int) -> Iterable[str]:
@@ -114,6 +125,10 @@ def lm_features() -> Features:
         "input_ids": Sequence(Value("int32")),
         "labels": Sequence(Value("int32")),
     })
+
+
+def empty_lm_dataset() -> Dataset:
+    return Dataset.from_dict({"input_ids": [], "labels": []}, features=lm_features())
 
 
 def augment_ocr(text: str, prob: float = 0.3) -> str:
@@ -624,6 +639,78 @@ def iter_fineweb_edu_prose(max_docs: int) -> Iterable[str]:
             return
 
 
+def iter_openwebmath_prose(max_docs: int) -> Iterable[str]:
+    produced = 0
+    seen: set[str] = set()
+    dataset_id = os.environ.get("OPENWEBMATH_DATASET", "open-web-math/open-web-math")
+    split = os.environ.get("OPENWEBMATH_SPLIT", "train")
+    try:
+        ds = load_dataset(dataset_id, split=split, streaming=True)
+    except Exception as exc:
+        print(f"WARNING: {dataset_id} unavailable for LM prose v2 math ({type(exc).__name__}: {exc})")
+        return
+    for row in ds:
+        text = clean_text(row.get("text") or row.get("content") or row.get("document"))
+        if not prose_ok(text, min_words=60):
+            continue
+        sig = prose_signature(text)
+        if not sig or sig in seen:
+            continue
+        seen.add(sig)
+        yield text
+        produced += 1
+        if max_docs > 0 and produced >= max_docs:
+            return
+
+
+def looks_code_heavy(text: str) -> bool:
+    text = clean_text(text)
+    lowered = text.lower()
+    code_markers = ["```", "def ", "class ", "import ", "function ", "const ", "let ", "var ", "</", "{", "};"]
+    if any(marker in lowered for marker in code_markers):
+        return True
+    punct = sum(ch in "{}[]();=<>|" for ch in text)
+    return punct > max(20, len(text) // 35)
+
+
+def iter_clean_qa_prose(max_docs: int) -> Iterable[str]:
+    produced = 0
+    seen: set[str] = set()
+    try:
+        ds = load_all_splits("databricks/databricks-dolly-15k")
+    except Exception as exc:
+        print(f"WARNING: databricks/databricks-dolly-15k unavailable for LM prose v2 QA ({type(exc).__name__}: {exc})")
+        return
+    allowed = {"closed_qa", "open_qa", "general_qa", "brainstorming", "summarization"}
+    for row in ds:
+        if clean_text(row.get("category")) not in allowed:
+            continue
+        instruction = clean_text(row.get("instruction"))
+        context = clean_text(row.get("context"))
+        response = clean_text(row.get("response"))
+        if not response or looks_code_heavy(response):
+            continue
+        parts = []
+        if prose_ok(context, min_words=30) and not looks_code_heavy(context):
+            parts.append(context)
+        if prose_ok(response, min_words=35):
+            parts.append(response)
+        if not parts:
+            continue
+        if instruction and len(instruction.split()) >= 6 and not looks_code_heavy(instruction):
+            text = clean_text(instruction + " " + " ".join(parts))
+        else:
+            text = clean_text(" ".join(parts))
+        sig = prose_signature(text)
+        if not sig or sig in seen:
+            continue
+        seen.add(sig)
+        yield text
+        produced += 1
+        if max_docs > 0 and produced >= max_docs:
+            return
+
+
 def app_doc_from_row(row: dict[str, Any]) -> str:
     lang = clean_text(row.get("lang") or row.get("language"))
     if lang and not lang.lower().startswith("en"):
@@ -747,6 +834,177 @@ def lm_prose(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: 
         cache_dir = os.path.join(output_dir, ".generator_cache", "lm_prose", split)
         os.makedirs(cache_dir, exist_ok=True)
         ds = Dataset.from_generator(make_generator(split), features=lm_features(), keep_in_memory=False, cache_dir=cache_dir)
+        ds.save_to_disk(split_dir)
+    print("=== DONE: prepare_datasets.py ===")
+
+
+def lm_prose_v2_sources() -> list[tuple[str, float, Iterable[str], int]]:
+    return [
+        (
+            "fineweb_edu",
+            env_float("LM_PROSE_V2_FINEWEB_EDU_RATIO", 0.45),
+            iter_fineweb_edu_prose(env_int("FINEWEB_EDU_MAX_DOCS", 0)),
+            env_int("FINEWEB_EDU_MIN_TOKENS", 0),
+        ),
+        (
+            "wikipedia",
+            env_float("LM_PROSE_V2_WIKIPEDIA_RATIO", 0.25),
+            iter_wikipedia_prose(env_int("WIKIPEDIA_MAX_DOCS", 0)),
+            env_int("WIKIPEDIA_MIN_TOKENS", 0),
+        ),
+        (
+            "msmarco_passages",
+            env_float("LM_PROSE_V2_MSMARCO_RATIO", 0.10),
+            iter_msmarco_passages(env_int("MSMARCO_PASSAGE_MAX_DOCS", 300000)),
+            env_int("MSMARCO_MIN_TOKENS", 0),
+        ),
+        (
+            "app_descriptions",
+            env_float("LM_PROSE_V2_APP_DESC_RATIO", 0.10),
+            iter_app_descriptions(env_int("APP_DESC_MAX_DOCS", 100000)),
+            env_int("APP_DESC_MIN_TOKENS", 0),
+        ),
+        (
+            "openwebmath",
+            env_float("LM_PROSE_V2_OPENWEBMATH_RATIO", 0.05),
+            iter_openwebmath_prose(env_int("OPENWEBMATH_MAX_DOCS", 0)),
+            env_int("OPENWEBMATH_MIN_TOKENS", 0),
+        ),
+        (
+            "clean_qa_prose",
+            env_float("LM_PROSE_V2_QA_RATIO", 0.05),
+            iter_clean_qa_prose(env_int("QA_PROSE_MAX_DOCS", 0)),
+            env_int("QA_PROSE_MIN_TOKENS", 0),
+        ),
+    ]
+
+
+def collect_lm_prose_v2_docs(base: str, overwrite: bool) -> None:
+    os.makedirs(base, exist_ok=True)
+    docs_path = os.path.join(base, "source_docs.jsonl")
+    stats_path = os.path.join(base, "source_stats.json")
+    if os.path.exists(docs_path) and os.path.exists(stats_path) and not overwrite:
+        print(f"{docs_path} exists; reusing")
+        return
+
+    target_tokens = env_int("LM_PROSE_V2_TARGET_TOKENS", 1200000000)
+    min_words = env_int("LM_PROSE_V2_MIN_WORDS", 40)
+    sources = [(name, ratio, rows, min_tokens) for name, ratio, rows, min_tokens in lm_prose_v2_sources() if ratio > 0]
+    ratio_total = sum(ratio for _, ratio, _, _ in sources)
+    if ratio_total <= 0:
+        raise ValueError("LM prose v2 source ratios sum to zero")
+
+    stats: dict[str, dict[str, int | float]] = {}
+    total_docs = 0
+    total_tokens = 0
+    seen: set[str] = set()
+    tmp_path = docs_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as out:
+        for name, ratio, rows, min_tokens in sources:
+            quota = int(target_tokens * (ratio / ratio_total))
+            if min_tokens > 0:
+                quota = max(quota, min_tokens)
+            source_docs = 0
+            source_tokens = 0
+            skipped_duplicate = 0
+            skipped_quality = 0
+            for text in rows:
+                text = clean_text(text)
+                if len(text.split()) < min_words:
+                    skipped_quality += 1
+                    continue
+                sig = prose_signature(text)
+                if not sig:
+                    skipped_quality += 1
+                    continue
+                if sig in seen:
+                    skipped_duplicate += 1
+                    continue
+                seen.add(sig)
+                approx_tokens = approx_token_count(text)
+                out.write(json.dumps({"source": name, "approx_tokens": approx_tokens, "text": text}, ensure_ascii=False) + "\n")
+                source_docs += 1
+                source_tokens += approx_tokens
+                total_docs += 1
+                total_tokens += approx_tokens
+                if source_tokens >= quota:
+                    break
+            stats[name] = {
+                "ratio": ratio,
+                "target_tokens": quota,
+                "docs": source_docs,
+                "approx_tokens": source_tokens,
+                "skipped_duplicate": skipped_duplicate,
+                "skipped_quality": skipped_quality,
+            }
+            print(f"source_done={name} docs={source_docs} approx_tokens={source_tokens} target_tokens={quota}")
+    os.replace(tmp_path, docs_path)
+    if total_docs == 0:
+        raise RuntimeError(
+            "lm_prose_v2 collected zero documents. Check network access, Hugging Face cache permissions, "
+            "source ratios, and dataset IDs before retrying."
+        )
+    with open(stats_path, "w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "dataset": "lm_prose_v2",
+                "target_tokens": target_tokens,
+                "approx_tokens": total_tokens,
+                "docs": total_docs,
+                "max_seq_len": env_int("LM_PROSE_V2_MAX_SEQ_LEN_NOTE", 256),
+                "sources": stats,
+            },
+            handle,
+            indent=2,
+            sort_keys=True,
+        )
+        handle.write("\n")
+    print(f"lm_prose_v2_docs={total_docs} approx_tokens={total_tokens} path={docs_path}")
+
+
+def lm_prose_v2(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: bool) -> None:
+    base = os.path.join(output_dir, "lm_prose_v2")
+    if stage1_complete(base) and not overwrite:
+        print(f"{base} exists; skipping")
+        print("=== DONE: prepare_datasets.py ===")
+        return
+    os.makedirs(base, exist_ok=True)
+    collect_lm_prose_v2_docs(base, overwrite)
+    docs_path = os.path.join(base, "source_docs.jsonl")
+    split_doc_counts = {"train": 0, "val": 0}
+    with open(docs_path, "r", encoding="utf-8") as handle:
+        for doc_idx, _ in enumerate(handle):
+            split_doc_counts["val" if doc_idx % 20 == 0 else "train"] += 1
+
+    def make_generator(wanted_split: str):
+        def gen():
+            sp = spm.SentencePieceProcessor(model_file=tokenizer_path)
+            with open(docs_path, "r", encoding="utf-8") as handle:
+                for doc_idx, line in enumerate(handle):
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    split = "val" if doc_idx % 20 == 0 else "train"
+                    if split != wanted_split:
+                        continue
+                    for encoded in encode_doc_lm(sp, clean_text(row.get("text")), max_seq_len):
+                        yield encoded
+
+        return gen
+
+    for split in ["train", "val"]:
+        split_dir = os.path.join(base, split)
+        if os.path.exists(split_dir):
+            shutil.rmtree(split_dir)
+        cache_dir = os.path.join(output_dir, ".generator_cache", "lm_prose_v2", split)
+        if overwrite and os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
+        os.makedirs(cache_dir, exist_ok=True)
+        if split_doc_counts[split] == 0:
+            ds = empty_lm_dataset()
+        else:
+            ds = Dataset.from_generator(make_generator(split), features=lm_features(), keep_in_memory=False, cache_dir=cache_dir)
         ds.save_to_disk(split_dir)
     print("=== DONE: prepare_datasets.py ===")
 
@@ -1032,7 +1290,7 @@ def stage3(output_dir: str, tokenizer_path: str, max_seq_len: int, overwrite: bo
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", choices=["1_text", "1", "lm_base", "lm_prose", "2", "3", "all"], required=True)
+    parser.add_argument("--stage", choices=["1_text", "1", "lm_base", "lm_prose", "lm_prose_v2", "2", "3", "all"], required=True)
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--tokenizer_path")
     parser.add_argument("--max_seq_len", type=int)
@@ -1046,6 +1304,8 @@ def main() -> None:
         lm_base(args.output_dir, args.tokenizer_path, args.max_seq_len or 256, args.overwrite)
     if args.stage in {"lm_prose", "all"}:
         lm_prose(args.output_dir, args.tokenizer_path, args.max_seq_len or 256, args.overwrite)
+    if args.stage == "lm_prose_v2":
+        lm_prose_v2(args.output_dir, args.tokenizer_path, args.max_seq_len or 256, args.overwrite)
     if args.stage in {"2", "all"}:
         stage2(args.output_dir, args.tokenizer_path, args.max_seq_len or 512, args.overwrite)
     if args.stage in {"3", "all"}:

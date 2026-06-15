@@ -699,6 +699,96 @@
       gap: 18px;
     }
 
+    .data-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .source-card,
+    .mix-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+      background: #fff;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .source-card h3,
+    .mix-card h3 {
+      margin: 0 0 10px;
+      font-size: 20px;
+    }
+
+    .source-card p,
+    .mix-card p {
+      margin: 0 0 14px;
+      color: var(--muted);
+    }
+
+    .source-list {
+      display: grid;
+      gap: 9px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .source-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--wash);
+      color: #334155;
+      font-size: 14px;
+    }
+
+    .source-list strong {
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    .mix-bar {
+      height: 34px;
+      display: flex;
+      overflow: hidden;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--wash);
+      margin: 14px 0 18px;
+    }
+
+    .mix-segment {
+      width: var(--w);
+      background: var(--c);
+    }
+
+    .mix-legend {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .mix-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: #334155;
+      font-size: 14px;
+    }
+
+    .mix-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 4px;
+      background: var(--c);
+      flex: 0 0 auto;
+    }
+
     .plot-card {
       padding: 0;
       overflow: hidden;
@@ -880,6 +970,7 @@
       .live-panel,
       .matrix,
       .status-grid,
+      .data-grid,
       .next-panel {
         grid-template-columns: 1fr;
       }
@@ -916,6 +1007,7 @@
       .model-facts,
       .grid-3,
       .plot-grid,
+      .mix-legend,
       .lesson-grid,
       .tab-buttons,
       .tab-panel {
@@ -948,6 +1040,7 @@
       <nav class="nav" aria-label="Page navigation">
         <a href="#overview">Overview</a>
         <a href="#iterations">Iterations</a>
+        <a href="#data">Data</a>
         <a href="#results">Results</a>
         <a href="#stand">Status</a>
         <a href="#next">Next</a>
@@ -1095,6 +1188,51 @@
             <div class="flow-step"><strong>10M</strong><span>Very weak base LM, worst validation loss.</span></div>
             <div class="flow-step"><strong>30M</strong><span>Better grammar and topical consistency than 20M.</span></div>
             <div class="flow-step"><strong>40M</strong><span>Best current checkpoint family, but not task-ready.</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="data">
+      <div class="section-head">
+        <h2>Training Data History</h2>
+        <p>The biggest lesson so far is that tiny decoders are very sensitive to corpus shape, not just corpus size.</p>
+      </div>
+      <div class="data-grid">
+        <article class="source-card">
+          <h3>What earlier iterations used</h3>
+          <p>Iteration 1 mixed short LM fragments with task rows. Iteration 3 moved to packed prose, but the samples show too much app-description style.</p>
+          <ul class="source-list">
+            <li><span>Iteration 1 Stage 1</span><strong>MS MARCO queries, SNIPS, ATIS, CORD OCR, Flickr, CodeX questions</strong></li>
+            <li><span>Iteration 1 Stage 2</span><strong>CoNLL, CORD-v2, SROIE, FUNSD, SNIPS, ATIS, Dolly</strong></li>
+            <li><span>Iteration 1 Stage 3</span><strong>Stage 2 task data plus MS MARCO autocomplete</strong></li>
+            <li><span>Iteration 3</span><strong><code>lm_prose</code>: app descriptions, MS MARCO passages, Dolly, optional Wikipedia/FineWeb-Edu</strong></li>
+          </ul>
+        </article>
+
+        <article class="mix-card">
+          <h3>Next corpus: <code>lm_prose_v2</code></h3>
+          <p>The new script builds a cleaner 40M-only corpus with broader prose and a hard cap on app-store language.</p>
+          <div class="mix-bar" aria-label="lm_prose_v2 source mix">
+            <div class="mix-segment" style="--w: 45%; --c: var(--teal);"></div>
+            <div class="mix-segment" style="--w: 25%; --c: var(--green);"></div>
+            <div class="mix-segment" style="--w: 10%; --c: var(--blue);"></div>
+            <div class="mix-segment" style="--w: 10%; --c: var(--amber);"></div>
+            <div class="mix-segment" style="--w: 5%; --c: var(--violet);"></div>
+            <div class="mix-segment" style="--w: 5%; --c: var(--coral);"></div>
+          </div>
+          <div class="mix-legend">
+            <div class="mix-item"><span class="mix-dot" style="--c: var(--teal);"></span><span>45% FineWeb-Edu</span></div>
+            <div class="mix-item"><span class="mix-dot" style="--c: var(--green);"></span><span>25% Wikipedia</span></div>
+            <div class="mix-item"><span class="mix-dot" style="--c: var(--blue);"></span><span>10% MS MARCO passages</span></div>
+            <div class="mix-item"><span class="mix-dot" style="--c: var(--amber);"></span><span>10% app descriptions</span></div>
+            <div class="mix-item"><span class="mix-dot" style="--c: var(--violet);"></span><span>5% OpenWebMath</span></div>
+            <div class="mix-item"><span class="mix-dot" style="--c: var(--coral);"></span><span>5% clean QA prose</span></div>
+          </div>
+          <div class="chips" style="margin-top: 18px;">
+            <span class="chip"><code>scripts/prepare_lm_prose_v2.sh</code></span>
+            <span class="chip">target 1.2B approximate source tokens</span>
+            <span class="chip">packed 256-token chunks</span>
           </div>
         </article>
       </div>
