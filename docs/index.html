@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tiniest Decoder Project Notes</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5d6d7e;
+      --line: #d7dde4;
+      --paper: #ffffff;
+      --soft: #f6f8fb;
+      --teal: #008c8c;
+      --green: #2d8a52;
+      --amber: #b87000;
+      --coral: #c84630;
+      --blue: #2867b2;
+      --shadow: 0 10px 28px rgba(23, 32, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration-thickness: 2px;
+      text-underline-offset: 3px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+    }
+
+    .topbar-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 760;
+      color: var(--ink);
+    }
+
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: linear-gradient(135deg, var(--teal), var(--green));
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    nav a:hover {
+      color: var(--ink);
+    }
+
+    .hero {
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(120deg, rgba(0, 140, 140, 0.10), rgba(184, 112, 0, 0.09)),
+        linear-gradient(180deg, #ffffff, #f7fafc);
+    }
+
+    .hero-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 70px 22px 54px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 42px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--teal);
+      font-size: 13px;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 780px;
+      font-size: 48px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 730px;
+      margin: 20px 0 0;
+      color: #34495e;
+      font-size: 19px;
+    }
+
+    .hero-actions {
+      margin-top: 28px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 10px 15px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: white;
+      font-weight: 700;
+      text-decoration: none;
+      box-shadow: 0 1px 0 rgba(23, 32, 42, 0.04);
+    }
+
+    .button.primary {
+      color: white;
+      border-color: var(--teal);
+      background: var(--teal);
+    }
+
+    .hero-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .hero-panel h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .score {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--paper);
+    }
+
+    .score span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .score strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 25px;
+      line-height: 1.1;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 42px 22px 80px;
+    }
+
+    section {
+      margin-top: 56px;
+    }
+
+    section:first-child {
+      margin-top: 0;
+    }
+
+    .section-head {
+      max-width: 820px;
+      margin-bottom: 22px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .section-head p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      padding: 18px;
+      box-shadow: 0 2px 14px rgba(23, 32, 42, 0.05);
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .metric-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      box-shadow: var(--shadow);
+    }
+
+    .metric-table th,
+    .metric-table td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    .metric-table th {
+      color: #34495e;
+      background: #eef4f7;
+      font-weight: 760;
+    }
+
+    .metric-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .num {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 58px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: white;
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .b10 { background: var(--coral); }
+    .b20 { background: var(--amber); }
+    .b30 { background: var(--blue); }
+    .b40 { background: var(--green); }
+
+    .bar-list {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 72px;
+      gap: 12px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .bar-track {
+      height: 14px;
+      border-radius: 999px;
+      background: #e8edf2;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: inherit;
+    }
+
+    .fill-10 { width: 68%; background: var(--coral); }
+    .fill-20 { width: 48%; background: var(--amber); }
+    .fill-30 { width: 41%; background: var(--blue); }
+    .fill-40 { width: 37%; background: var(--green); }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .visual {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      background: var(--soft);
+    }
+
+    .plot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    figure {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: white;
+      box-shadow: 0 2px 14px rgba(23, 32, 42, 0.05);
+    }
+
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    figcaption {
+      padding: 11px 13px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 16px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 18px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      box-shadow: 0 2px 14px rgba(23, 32, 42, 0.05);
+    }
+
+    .timeline-item .when {
+      color: var(--teal);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .timeline-item h3 {
+      margin: 0 0 6px;
+      font-size: 19px;
+    }
+
+    .timeline-item p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .callout {
+      border-left: 5px solid var(--teal);
+      border-radius: 8px;
+      padding: 18px 20px;
+      background: #edf8f7;
+      color: #1b4f53;
+    }
+
+    .callout strong {
+      color: #123b3e;
+    }
+
+    .lesson-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .lesson-list li {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 15px 16px;
+      background: white;
+    }
+
+    .lesson-list strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .lesson-list span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .step-list {
+      counter-reset: step;
+      display: grid;
+      gap: 12px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: white;
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--teal);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #eef2f6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.94em;
+    }
+
+    pre {
+      margin: 0;
+      padding: 16px;
+      overflow: auto;
+      border-radius: 8px;
+      color: #eef6f8;
+      background: #17202a;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      background: var(--soft);
+    }
+
+    .footer-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 22px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .hero-inner,
+      .split,
+      .plot-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cards,
+      .lesson-list {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      nav {
+        display: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      h1 {
+        font-size: 34px;
+      }
+
+      .lead {
+        font-size: 17px;
+      }
+
+      .cards,
+      .score-grid,
+      .lesson-list {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline-item,
+      .bar-row {
+        grid-template-columns: 1fr;
+      }
+
+      .metric-table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><span class="mark">TD</span><span>Tiniest Decoder</span></div>
+      <nav aria-label="Page navigation">
+        <a href="#goal">Goal</a>
+        <a href="#iterations">Iterations</a>
+        <a href="#results">Results</a>
+        <a href="#learnings">Learnings</a>
+        <a href="#next">Next</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <div>
+        <p class="eyebrow">Tiny decoder ablation study</p>
+        <h1>How far can a very small decoder learn language?</h1>
+        <p class="lead">
+          This project compares 9M, 20M, 31M, and 40M parameter decoder-only language models trained from scratch under a controlled local setup. The current answer: the 40M model is the best baseline, but corpus quality is now the bottleneck.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="#results">View current results</a>
+          <a class="button" href="https://github.com/ravisankarg/tiny-decoder#readme">Read README</a>
+        </div>
+      </div>
+
+      <aside class="hero-panel" aria-label="Current status summary">
+        <h2>Current status</h2>
+        <div class="score-grid">
+          <div class="score"><span>Best model</span><strong>40M</strong></div>
+          <div class="score"><span>Best val loss</span><strong>3.5988</strong></div>
+          <div class="score"><span>Best ppl</span><strong>36.55</strong></div>
+          <div class="score"><span>Tokens/model</span><strong>4.071B</strong></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <main>
+    <section id="goal">
+      <div class="section-head">
+        <h2>Project Goal</h2>
+        <p>The objective is not to build a large general assistant. The objective is to learn how much language capability can be extracted from tiny decoders when data, tokenizer, optimizer, context length, and token budget are controlled.</p>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <h3>Base LM first</h3>
+          <p>Train plain continuation before adding OCR, instruction, or autocomplete behavior.</p>
+        </article>
+        <article class="card">
+          <h3>Controlled ablation</h3>
+          <p>Keep the dataset and optimizer fixed while comparing model size.</p>
+        </article>
+        <article class="card">
+          <h3>Local constraint</h3>
+          <p>Use conservative batches and gradient accumulation for small GPU training.</p>
+        </article>
+        <article class="card">
+          <h3>Evidence driven</h3>
+          <p>Use validation loss, perplexity, plots, and fixed prompt samples together.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <div class="section-head">
+        <h2>Architecture Family</h2>
+        <p>All current models use the same decoder design and tokenizer. The main variable is capacity.</p>
+      </div>
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>Experiment</th>
+            <th>Config</th>
+            <th class="num">Layers</th>
+            <th class="num">Hidden</th>
+            <th class="num">Heads</th>
+            <th class="num">FFN</th>
+            <th class="num">Parameters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="badge b10">10M</span></td><td><code>model_config_10m.json</code></td><td class="num">6</td><td class="num">256</td><td class="num">4</td><td class="num">1,024</td><td class="num">8,835,072</td></tr>
+          <tr><td><span class="badge b20">20M</span></td><td><code>model_config.json</code></td><td class="num">8</td><td class="num">384</td><td class="num">6</td><td class="num">1,536</td><td class="num">20,340,480</td></tr>
+          <tr><td><span class="badge b30">30M</span></td><td><code>model_config_30m.json</code></td><td class="num">10</td><td class="num">448</td><td class="num">7</td><td class="num">1,792</td><td class="num">31,311,616</td></tr>
+          <tr><td><span class="badge b40">40M</span></td><td><code>model_config_40m.json</code></td><td class="num">10</td><td class="num">512</td><td class="num">8</td><td class="num">2,048</td><td class="num">39,716,864</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="iterations">
+      <div class="section-head">
+        <h2>Iteration History</h2>
+        <p>The project has moved from mixed task training to a cleaner base-LM-first ablation.</p>
+      </div>
+      <div class="timeline">
+        <article class="timeline-item">
+          <div class="when">Iteration 1</div>
+          <div>
+            <h3>Mixed-stage training failed as a language model</h3>
+            <p>A 20M decoder completed Stage 1, Stage 2, and Stage 3, but generation fell into token loops. Padding was trained as a target, the base data was fragmented, and task finetuning arrived before the base LM was coherent.</p>
+          </div>
+        </article>
+        <article class="timeline-item">
+          <div class="when">Iteration 2</div>
+          <div>
+            <h3>Base LM first</h3>
+            <p>The project reset around packed text chunks, ignored padding labels, no label smoothing, and controlled comparisons between 10M, 20M, 30M, and 40M parameter configs.</p>
+          </div>
+        </article>
+        <article class="timeline-item">
+          <div class="when">2026-06-15</div>
+          <div>
+            <h3>Full Stage 1 language ablation</h3>
+            <p>All four model sizes trained for 248,500 steps on the same <code>lm_prose</code> corpus, each seeing 4.071B token slots. The 40M model won by validation loss and qualitative readability.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="results">
+      <div class="section-head">
+        <h2>Current Results</h2>
+        <p>Validation loss improves consistently as capacity increases. The tradeoff is speed: the 40M model is higher quality, but much slower than the 10M model.</p>
+      </div>
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th class="num">Final train loss</th>
+            <th class="num">Final val loss</th>
+            <th class="num">Final ppl</th>
+            <th class="num">Best val loss</th>
+            <th class="num">Best ppl</th>
+            <th class="num">Tokens/sec</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="badge b10">10M</span></td><td class="num">3.2237</td><td class="num">4.2208</td><td class="num">68.09</td><td class="num">4.2178</td><td class="num">67.88</td><td class="num">40,208</td></tr>
+          <tr><td><span class="badge b20">20M</span></td><td class="num">2.8819</td><td class="num">3.8677</td><td class="num">47.83</td><td class="num">3.8677</td><td class="num">47.83</td><td class="num">21,438</td></tr>
+          <tr><td><span class="badge b30">30M</span></td><td class="num">2.7437</td><td class="num">3.7047</td><td class="num">40.64</td><td class="num">3.7042</td><td class="num">40.62</td><td class="num">13,764</td></tr>
+          <tr><td><span class="badge b40">40M</span></td><td class="num">2.6767</td><td class="num">3.6010</td><td class="num">36.63</td><td class="num">3.5988</td><td class="num">36.55</td><td class="num">11,350</td></tr>
+        </tbody>
+      </table>
+
+      <div class="split" style="margin-top: 22px;">
+        <div class="visual">
+          <h3 style="margin-top: 0;">Perplexity trend</h3>
+          <div class="bar-list" aria-label="Perplexity comparison">
+            <div class="bar-row"><strong>10M</strong><div class="bar-track"><div class="bar-fill fill-10"></div></div><span>68.09</span></div>
+            <div class="bar-row"><strong>20M</strong><div class="bar-track"><div class="bar-fill fill-20"></div></div><span>47.83</span></div>
+            <div class="bar-row"><strong>30M</strong><div class="bar-track"><div class="bar-fill fill-30"></div></div><span>40.64</span></div>
+            <div class="bar-row"><strong>40M</strong><div class="bar-track"><div class="bar-fill fill-40"></div></div><span>36.63</span></div>
+          </div>
+        </div>
+        <div class="visual">
+          <h3 style="margin-top: 0;">Training setup</h3>
+          <svg viewBox="0 0 640 230" role="img" aria-label="Training pipeline from lm_prose data to metrics" style="width: 100%; height: auto;">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#5d6d7e"></path>
+              </marker>
+            </defs>
+            <rect x="18" y="42" width="130" height="76" rx="8" fill="#ffffff" stroke="#d7dde4"></rect>
+            <text x="83" y="72" text-anchor="middle" font-size="17" font-weight="700" fill="#17202a">lm_prose</text>
+            <text x="83" y="96" text-anchor="middle" font-size="13" fill="#5d6d7e">5.3M chunks</text>
+            <line x1="148" y1="80" x2="226" y2="80" stroke="#5d6d7e" stroke-width="3" marker-end="url(#arrow)"></line>
+            <rect x="228" y="42" width="150" height="76" rx="8" fill="#ffffff" stroke="#d7dde4"></rect>
+            <text x="303" y="72" text-anchor="middle" font-size="17" font-weight="700" fill="#17202a">4 model sizes</text>
+            <text x="303" y="96" text-anchor="middle" font-size="13" fill="#5d6d7e">same token budget</text>
+            <line x1="378" y1="80" x2="456" y2="80" stroke="#5d6d7e" stroke-width="3" marker-end="url(#arrow)"></line>
+            <rect x="458" y="42" width="150" height="76" rx="8" fill="#ffffff" stroke="#d7dde4"></rect>
+            <text x="533" y="72" text-anchor="middle" font-size="17" font-weight="700" fill="#17202a">Metrics</text>
+            <text x="533" y="96" text-anchor="middle" font-size="13" fill="#5d6d7e">loss, ppl, samples</text>
+            <rect x="110" y="158" width="420" height="38" rx="19" fill="#edf8f7" stroke="#b8dedc"></rect>
+            <text x="320" y="183" text-anchor="middle" font-size="15" font-weight="700" fill="#1b4f53">Best current baseline: lm_40m</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section id="plots">
+      <div class="section-head">
+        <h2>Training Curves</h2>
+        <p>These plots are regenerated from the current checkpoint CSV logs.</p>
+      </div>
+      <div class="plot-grid">
+        <figure>
+          <img src="plots/lm_val_loss_vs_tokens.png" alt="Validation loss versus tokens seen for all LM ablation runs">
+          <figcaption>Validation loss versus cumulative token slots processed.</figcaption>
+        </figure>
+        <figure>
+          <img src="plots/lm_val_loss_vs_epoch.png" alt="Validation loss versus epoch for all LM ablation runs">
+          <figcaption>Validation loss by epoch across model sizes.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="stand">
+      <div class="section-head">
+        <h2>Where We Stand</h2>
+        <p>The ablation is useful and the ranking is clear, but the decoder is not finished.</p>
+      </div>
+      <div class="callout">
+        <strong>Current state:</strong> <code>lm_40m</code> is the best checkpoint family so far, but it is still a baseline. It can produce readable text, yet the language remains generic, shallow, repetitive, and biased toward app-description phrasing.
+      </div>
+      <div style="margin-top: 18px;">
+        <pre>The best place to visit in =&gt; the world. The best place to visit is where you can easily find and view more than one hundred people who can be visiting.
+A smartphone camera app can =&gt; be installed by using its iPhone or iPad. A mobile phone is a device that uses an iOS device...
+Machine learning is useful because =&gt; you are not only an engineer, but also a computer scientist. Features: - Easy to use, easy to use...</pre>
+      </div>
+    </section>
+
+    <section id="learnings">
+      <div class="section-head">
+        <h2>Key Learnings</h2>
+        <p>The current bottleneck is no longer whether the training loop works. It is data quality and base language behavior.</p>
+      </div>
+      <ul class="lesson-list">
+        <li><strong>Capacity matters.</strong><span>The 40M model has the best validation loss and about 46 percent lower final perplexity than the 10M model.</span></li>
+        <li><strong>Tokens per parameter are not enough.</strong><span>The 10M model saw the most tokens per parameter but still had the weakest validation loss.</span></li>
+        <li><strong>Loss is not the whole story.</strong><span>The best loss still produced shallow samples, so prompt checks must stay in the loop.</span></li>
+        <li><strong>Task training should wait.</strong><span>OCR, instruction parsing, and autocomplete should resume only after the base LM is stronger.</span></li>
+      </ul>
+    </section>
+
+    <section id="next">
+      <div class="section-head">
+        <h2>Recommended Next Step</h2>
+        <p>Continue with the 40M config, but do not simply train more on the same corpus.</p>
+      </div>
+      <ol class="step-list">
+        <li>Build <code>lm_prose_v2</code> with cleaner and broader packed prose.</li>
+        <li>Reduce repeated app-store and feature-list style text.</li>
+        <li>Keep packed 256-token chunks so the run stays comparable.</li>
+        <li>Train <code>lm_40m</code> first against the new corpus.</li>
+        <li>Compare validation loss, perplexity, and fixed prompt samples against the 2026-06-15 baseline.</li>
+        <li>Run 20M or 30M controls only after the 40M v2 result proves the data improved language behavior.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      Generated from local training artifacts in <code>std_gallery</code>. Last project status captured on 2026-06-15.
+    </div>
+  </footer>
+</body>
+</html>
