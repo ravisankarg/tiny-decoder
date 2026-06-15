@@ -163,7 +163,7 @@ The packed LM dataset is built from `data/corpus.txt` into:
 
 The improved prose LM path also adds app-description sources so the base model sees smartphone and application-domain language before task finetuning. Current public sources include Google Play app metadata from MobileRec and Mac App Store description text. These are used as prose documents, not as scraped live store pages.
 
-The first model-size comparison processed about 123M cumulative training token slots over three epochs. That was useful for debugging, but it is still small for judging whether 10M, 20M, 30M, and 40M parameter decoders can learn useful language. The next train-split target is roughly 1B token slots while keeping the same document-style LM format.
+The current full model-size comparison processed about 4.071B cumulative training token slots over three epochs. This is large enough to show a clear size trend, but the generated text is still shallow and repetitive, so the result should be treated as a useful base-LM baseline rather than a finished language model.
 
 The expanded prose corpus can stream additional public text from:
 
@@ -200,39 +200,92 @@ Training launchers default to `--precision bf16` because BF16 uses the same 16-b
 
 For ablation runs, `--overwrite` means a fresh run. The launcher clears the same-name checkpoint/log output before starting and does not resume `latest.pt` or `best.pt`. Without `--overwrite`, it will resume an existing same-name checkpoint when available.
 
-## First Ablation Results
+## Iteration 3: 2026-06-15 Full Stage 1 Language Ablation
 
-The first controlled comparison used the same `lm_prose` dataset, 3 epochs, 7,500 training steps, 122.88M cumulative token slots processed, and 16,384 effective tokens per optimizer update for all four model sizes.
+All four Stage 1/base-LM model configs have now been trained on the same `lm_prose` corpus. In the training metadata this run is recorded as `stage=0`, but conceptually it is the Stage 1 base-language phase: no OCR, instruction, or autocomplete finetuning has been applied.
+
+Common training setup:
+
+- Dataset: `lm_prose`
+- Train rows: 5,309,400 packed 256-token chunks
+- Validation rows: 279,934 packed 256-token chunks
+- Epochs: 3
+- Steps: 248,500
+- Tokens/update: 16,384
+- Tokens seen per model: 4,071,424,000 token slots
+- Optimizer settings: `lr=0.0002`, `min_lr=0.00001`, `warmup_steps=1000`, `weight_decay=0.01`
+- Precision: BF16
+- Label smoothing: `0.0`
+- Output dirs: `checkpoints/lm_10m`, `checkpoints/lm_20m`, `checkpoints/lm_30m`, `checkpoints/lm_40m`
 
 ![Validation loss vs tokens seen](docs/plots/lm_val_loss_vs_tokens.png)
 
 ![Validation loss vs epoch](docs/plots/lm_val_loss_vs_epoch.png)
 
-| Experiment | Parameters | Batch | Accum | Tokens/update | Steps | Tokens seen | Validation loss |
+### Model Configs And Training Results
+
+| Experiment | Config | Layers | Hidden | Heads | FFN | Parameters | Batch | Accum | Final train loss | Final val loss | Final ppl |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `lm_10m` | `model_config_10m.json` | 6 | 256 | 4 | 1,024 | 8,835,072 | 32 | 2 | 3.2237 | 4.2208 | 68.09 |
+| `lm_20m` | `model_config.json` | 8 | 384 | 6 | 1,536 | 20,340,480 | 16 | 4 | 2.8819 | 3.8677 | 47.83 |
+| `lm_30m` | `model_config_30m.json` | 10 | 448 | 7 | 1,792 | 31,311,616 | 8 | 8 | 2.7437 | 3.7047 | 40.64 |
+| `lm_40m` | `model_config_40m.json` | 10 | 512 | 8 | 2,048 | 39,716,864 | 4 | 16 | 2.6767 | 3.6010 | 36.63 |
+
+Best checkpoint metrics:
+
+| Experiment | Best step | Best val loss | Best ppl | Final step | Tokens/param | Train time | Tokens/sec |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `lm_10m` | 8,835,072 | 32 | 2 | 16,384 | 7,500 | 122,880,000 | 4.2634 |
-| `lm_20m` | 20,340,480 | 16 | 4 | 16,384 | 7,500 | 122,880,000 | 3.9137 |
-| `lm_30m` | 31,311,616 | 8 | 8 | 16,384 | 7,500 | 122,880,000 | 3.7632 |
-| `lm_40m` | 39,716,864 | 4 | 16 | 16,384 | 7,500 | 122,880,000 | 3.6499 |
+| `lm_10m` | 243,500 | 4.2178 | 67.88 | 248,500 | 460.83 | 1,687.7 min | 40,208 |
+| `lm_20m` | 248,500 | 3.8677 | 47.83 | 248,500 | 200.16 | 3,165.3 min | 21,438 |
+| `lm_30m` | 248,000 | 3.7042 | 40.62 | 248,500 | 130.03 | 4,930.0 min | 13,764 |
+| `lm_40m` | 247,000 | 3.5988 | 36.55 | 248,500 | 102.51 | 5,978.6 min | 11,350 |
 
-| Experiment | First val loss | Final val loss | Loss drop | Tokens/param | Train minutes | Tokens/sec |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `lm_10m` | 7.1565 | 4.2634 | 2.8930 | 13.91 | 43.4 | 47,202 |
-| `lm_20m` | 6.7263 | 3.9137 | 2.8126 | 6.04 | 84.9 | 24,126 |
-| `lm_30m` | 6.5595 | 3.7632 | 2.7963 | 3.92 | 130.1 | 15,744 |
-| `lm_40m` | 6.4547 | 3.6499 | 2.8049 | 3.09 | 156.0 | 13,127 |
+### Language Capability Level
 
-The validation loss improved steadily as parameter count increased. This is the expected direction and suggests that the ablation setup is useful. However, generated text was still weak, so this run should be treated as a pipeline baseline, not a solved base model.
+The strongest objective metric is validation loss on held-out packed prose. By that metric, model size helped consistently: `lm_40m` is best, then `lm_30m`, then `lm_20m`, then `lm_10m`.
 
-Technical notes from this result:
+Qualitative fixed-seed continuation checks on 2026-06-15 showed:
 
-- 122.88M cumulative token slots processed is too small to judge final tiny-LM capability.
-- The larger models benefited from capacity even under the same token budget.
-- The 40M model reached the best validation loss, but it trained about 3.6x slower than the 10M model on the same 4 GB RTX 3050 Laptop GPU.
-- The 10M model saw the most tokens per parameter but still had the worst validation loss, so token-per-parameter alone did not compensate for limited capacity in this setup.
-- All four curves were still descending at the end of 3 epochs, especially the larger models, which suggests the 122.88M-token-slot run was undertrained.
-- The train-loss column from this run was not a reliable cross-model comparison because the logging denominator was fixed after this run; validation loss is the cleaner signal.
-- The next train-split target is around 1B token slots so the same ablation can be repeated at a more meaningful scale.
+- `lm_10m`: can form English sentences, but loops simple phrases and generic words. Capability level: very weak base LM.
+- `lm_20m`: more sentence-like and sometimes topical, but still confuses domains and invents odd facts. Capability level: weak but usable for pipeline checks.
+- `lm_30m`: better grammar and topical consistency, but still repeats app-description style and shallow clauses. Capability level: early base LM.
+- `lm_40m`: best validation loss and most readable continuations, but still repetitive, generic, and not reliable. Capability level: best current base LM, not ready for task finetuning as a language backbone.
+
+Representative samples from `lm_40m`:
+
+```text
+The best place to visit in => the world. The best place to visit is where you can easily find and view more than one hundred people who can be visiting.
+A smartphone camera app can => be installed by using its iPhone or iPad. A mobile phone is a device that uses an iOS device...
+Machine learning is useful because => you are not only an engineer, but also a computer scientist. Features: - Easy to use, easy to use...
+```
+
+### Learnings
+
+- Capacity matters in this setup. The 40M model has the best final validation loss and about 46 percent lower perplexity than the 10M model.
+- The larger models are much slower, but the quality gain is real. `lm_40m` ran at about 11.3k tokens/sec versus about 40.2k tokens/sec for `lm_10m`.
+- The 10M model received the most tokens per parameter, but it still had the worst validation loss. More tokens per parameter did not overcome limited capacity.
+- The current dataset teaches fluent surface text but appears too repetitive and app-description-heavy. Generated text often falls into generic feature-list language.
+- Validation loss alone is not enough. The 40M model has the best loss, but samples still show repetition and weak semantics.
+
+### Mistakes To Avoid Repeating
+
+- Do not start Stage 2/Stage 3 task finetuning yet. The base LM is readable but not strong enough; task finetuning would likely overwrite or narrow it.
+- Do not judge language capability only from loss. Always run a small fixed prompt set after each run.
+- Do not keep scaling steps on the same data if samples plateau into the same generic style. That will mostly strengthen the dataset bias.
+- Do not compare train loss across old runs unless the logging denominator and dataset are known to match. Current comparison should use validation loss and samples.
+
+### Recommendation
+
+Continue with the 40M config, but do not simply repeat the same 40M training on the same `lm_prose` data. The best next experiment is a 40M Stage 1 run on cleaner and broader packed prose:
+
+1. Build a new `lm_prose_v2` corpus with less repeated app-store language and more high-quality general text.
+2. Keep 256 context for the next controlled run so it remains comparable.
+3. Train `lm_40m` first, because it is the best current quality point.
+4. Add a short 20M or 30M control only after the 40M v2 run shows better samples.
+5. Track both validation loss/perplexity and a fixed qualitative prompt set.
+6. Only begin task finetuning after the 40M base model can continue simple prompts without obvious loops.
+
+The practical answer: yes, continue 40M training, but with new data and cleaner corpus balance, not more epochs on the same corpus. If the goal is language capability, data quality and diversity are now the next bottleneck more than architecture.
 
 Plots can be regenerated from local checkpoint CSVs with:
 
@@ -253,13 +306,13 @@ If the base LM still repeats tokens or produces nonsense, task training should n
 
 ## Next Planned Iterations
 
-After Iteration 2 produces a usable base LM:
+After the 2026-06-15 Stage 1 ablation, the next work should improve the 40M base LM before any task-specific training:
 
-1. Add instruction/OCR training with a small learning rate.
-2. Mix LM data during task finetuning to reduce forgetting.
-3. Keep task ratios explicit, for example mostly LM with smaller task batches.
-4. Evaluate plain LM quality after each task stage.
-5. Only keep checkpoints that preserve base continuation quality.
+1. Build `lm_prose_v2` with cleaner, broader packed prose and less repetitive app-description text.
+2. Train `lm_40m` on the new data first, using the same 256-token context and fixed prompt evals.
+3. Compare validation loss, perplexity, and qualitative continuations against the 2026-06-15 `lm_40m` baseline.
+4. Only if the base LM improves, run a smaller 20M or 30M control to check whether the data improvement generalizes.
+5. Add instruction/OCR/autocomplete training later with a small learning rate and a continued LM-data mix to reduce forgetting.
 
 ## Key Lesson
 
