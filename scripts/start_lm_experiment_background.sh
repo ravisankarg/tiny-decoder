@@ -45,8 +45,8 @@ if [[ -z "${LM_BATCH_SIZE:-}" || -z "${LM_GRAD_ACCUM_STEPS:-}" ]]; then
     auto_batch_size=8
     auto_grad_accum_steps=8
   else
-    auto_batch_size=4
-    auto_grad_accum_steps=16
+    auto_batch_size=16
+    auto_grad_accum_steps=8
   fi
 fi
 

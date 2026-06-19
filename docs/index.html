@@ -414,7 +414,7 @@
 
     .bar-row {
       display: grid;
-      grid-template-columns: 62px 1fr 68px;
+      grid-template-columns: 72px 1fr 68px;
       gap: 11px;
       align-items: center;
       font-size: 13px;
@@ -1028,7 +1028,7 @@
       }
 
       .bar-row {
-        grid-template-columns: 54px 1fr 62px;
+        grid-template-columns: 64px 1fr 62px;
       }
     }
   </style>
@@ -1051,20 +1051,20 @@
   <section class="hero">
     <div class="hero-inner">
       <div>
-        <p class="eyebrow">Stage 1 language ablation complete</p>
+        <p class="eyebrow">40M v2 language run complete</p>
         <h1>Tiny decoders, measured like a real experiment.</h1>
         <p class="hero-lead">
-          A controlled study of 9M, 20M, 31M, and 40M parameter decoder-only language models trained from scratch on packed prose. The current winner is clear; the next bottleneck is cleaner data.
+          A controlled study of 9M, 20M, 31M, and 40M parameter decoder-only language models trained from scratch on packed prose. The cleaner 40M v2 corpus is now the objective winner, but samples still show repetition.
         </p>
         <div class="hero-actions">
           <a class="button primary" href="#results">Explore results</a>
           <a class="button" href="https://github.com/ravisankarg/tiny-decoder#readme">Open repository</a>
         </div>
         <div class="hero-mini" aria-label="Project headline metrics">
-          <div class="mini-stat"><span>Best model</span><strong>40M</strong></div>
-          <div class="mini-stat"><span>Token slots</span><strong>4.071B</strong></div>
-          <div class="mini-stat"><span>Best loss</span><strong>3.5988</strong></div>
-          <div class="mini-stat"><span>Best ppl</span><strong>36.55</strong></div>
+          <div class="mini-stat"><span>Best model</span><strong>40M v2</strong></div>
+          <div class="mini-stat"><span>Token slots</span><strong>3.457B</strong></div>
+          <div class="mini-stat"><span>Best loss</span><strong>3.1329</strong></div>
+          <div class="mini-stat"><span>Best ppl</span><strong>22.94</strong></div>
         </div>
       </div>
 
@@ -1078,20 +1078,20 @@
             <button class="model-button" data-model="m10" type="button"><span>smallest</span><strong>10M</strong></button>
             <button class="model-button" data-model="m20" type="button"><span>baseline</span><strong>20M</strong></button>
             <button class="model-button" data-model="m30" type="button"><span>middle</span><strong>30M</strong></button>
-            <button class="model-button active" data-model="m40" type="button"><span>winner</span><strong>40M</strong></button>
+            <button class="model-button active" data-model="m40" type="button"><span>winner</span><strong>40M v2</strong></button>
           </div>
           <div class="live-panel">
             <div class="dial" id="dial">
               <div class="dial-content">
                 <span>validation ppl</span>
-                <strong id="dialValue">36.55</strong>
+                <strong id="dialValue">22.94</strong>
               </div>
             </div>
             <div class="model-facts">
               <div class="fact"><span>parameters</span><strong id="factParams">39.7M</strong></div>
-              <div class="fact"><span>best val loss</span><strong id="factLoss">3.5988</strong></div>
-              <div class="fact"><span>tokens/sec</span><strong id="factSpeed">11,350</strong></div>
-              <div class="fact"><span>capability</span><strong id="factLevel">best baseline</strong></div>
+              <div class="fact"><span>best val loss</span><strong id="factLoss">3.1329</strong></div>
+              <div class="fact"><span>tokens/sec</span><strong id="factSpeed">13,610</strong></div>
+              <div class="fact"><span>capability</span><strong id="factLevel">best loss, looping</strong></div>
             </div>
           </div>
           <div class="bars" aria-label="Perplexity comparison bars">
@@ -1099,6 +1099,7 @@
             <div class="bar-row"><span>20M</span><div class="bar-track"><div class="bar-fill" style="--w: 70%; --c: var(--amber);"></div></div><span>47.83</span></div>
             <div class="bar-row"><span>30M</span><div class="bar-track"><div class="bar-fill" style="--w: 60%; --c: var(--blue);"></div></div><span>40.64</span></div>
             <div class="bar-row"><span>40M</span><div class="bar-track"><div class="bar-fill" style="--w: 54%; --c: var(--green);"></div></div><span>36.55</span></div>
+            <div class="bar-row"><span>40M v2</span><div class="bar-track"><div class="bar-fill" style="--w: 34%; --c: var(--teal);"></div></div><span>22.94</span></div>
           </div>
         </div>
       </aside>
@@ -1211,8 +1212,8 @@
         </article>
 
         <article class="mix-card">
-          <h3>Next corpus: <code>lm_prose_v2</code></h3>
-          <p>The new script builds a cleaner 40M-only corpus with broader prose and a hard cap on app-store language.</p>
+          <h3>Latest corpus: <code>lm_prose_v2</code></h3>
+          <p>The v2 script built a cleaner 40M-only corpus with broader prose and a hard cap on app-store language.</p>
           <div class="mix-bar" aria-label="lm_prose_v2 source mix">
             <div class="mix-segment" style="--w: 45%; --c: var(--teal);"></div>
             <div class="mix-segment" style="--w: 25%; --c: var(--green);"></div>
@@ -1231,7 +1232,8 @@
           </div>
           <div class="chips" style="margin-top: 18px;">
             <span class="chip"><code>scripts/prepare_lm_prose_v2.sh</code></span>
-            <span class="chip">target 1.2B approximate source tokens</span>
+            <span class="chip">4,507,560 train chunks</span>
+            <span class="chip">237,556 val chunks</span>
             <span class="chip">packed 256-token chunks</span>
           </div>
         </article>
@@ -1241,7 +1243,7 @@
     <section id="results">
       <div class="section-head">
         <h2>Results Dashboard</h2>
-        <p>The ranking is clean: larger models reached lower validation loss and lower perplexity under the same setup.</p>
+        <p>The original size ranking was clean, and the cleaner 40M v2 data run made the largest jump in validation quality.</p>
       </div>
       <div class="matrix">
         <div>
@@ -1260,16 +1262,17 @@
               <tr><td><span class="badge b20">20M</span></td><td class="num">20.3M</td><td class="num">3.8677</td><td class="num">47.83</td><td class="num">21,438</td></tr>
               <tr><td><span class="badge b30">30M</span></td><td class="num">31.3M</td><td class="num">3.7047</td><td class="num">40.62</td><td class="num">13,764</td></tr>
               <tr><td><span class="badge b40">40M</span></td><td class="num">39.7M</td><td class="num">3.6010</td><td class="num">36.55</td><td class="num">11,350</td></tr>
+              <tr><td><span class="badge b40">40M v2</span></td><td class="num">39.7M</td><td class="num">3.1331</td><td class="num">22.94</td><td class="num">13,610</td></tr>
             </tbody>
           </table>
         </div>
         <aside class="panel">
           <h3>Interpretation</h3>
-          <p><code>lm_40m</code> is the best current quality point. It is slower, but the validation and perplexity gap is meaningful enough to make it the right next model to improve with better data.</p>
+          <p><code>lm_40m_v2</code> is the best objective checkpoint so far: same 39.7M parameter config, cleaner <code>lm_prose_v2</code> data, and a 36.9 percent perplexity reduction versus the 2026-06-15 <code>lm_40m</code> baseline.</p>
           <div class="chips">
-            <span class="chip">best objective metrics</span>
-            <span class="chip">best samples</span>
-            <span class="chip">not task-ready</span>
+            <span class="chip">best validation loss</span>
+            <span class="chip">cleaner corpus helped</span>
+            <span class="chip">still loops</span>
           </div>
         </aside>
       </div>
@@ -1285,14 +1288,14 @@
           <img src="plots/lm_val_loss_vs_tokens.png" alt="Validation loss versus tokens seen">
           <figcaption>
             <h3>Loss by tokens seen</h3>
-            <p>The 40M curve stays below the smaller models after the same cumulative token budget.</p>
+            <p>The v2 curve drops below every earlier run despite seeing fewer token slots than the original ablation runs.</p>
           </figcaption>
         </figure>
         <figure class="plot-card">
           <img src="plots/lm_val_loss_vs_epoch.png" alt="Validation loss versus epoch">
           <figcaption>
             <h3>Loss by epoch</h3>
-            <p>All models improve, but larger capacity consistently wins by held-out validation loss.</p>
+            <p>The cleaner 40M v2 run reaches the lowest held-out loss by the end of epoch 3.</p>
           </figcaption>
         </figure>
       </div>
@@ -1301,12 +1304,12 @@
     <section id="stand">
       <div class="section-head">
         <h2>Where We Stand</h2>
-        <p>The experiment is now a useful baseline, not a finished decoder.</p>
+        <p>The experiment now has a better objective baseline, but not a finished decoder.</p>
       </div>
       <div class="status-grid">
         <article class="panel">
           <h3>Current capability level</h3>
-          <p>The model can produce readable English continuations, but the language is still shallow, generic, repetitive, and biased toward app-description style. Task finetuning should still wait.</p>
+          <p><code>lm_40m_v2</code> produces readable English and beats the older 40M run on validation loss, but greedy continuations still collapse into repeated phrases. Task finetuning should still wait.</p>
           <div class="chips">
             <span class="chip">readable</span>
             <span class="chip">generic</span>
@@ -1315,12 +1318,12 @@
           </div>
         </article>
         <div class="terminal" aria-label="Representative generated text">
-          <div class="terminal-head"><span>fixed prompt samples</span><span>lm_40m</span></div>
-          <pre>The best place to visit in => the world. The best place to visit is where you can easily find and view more than one hundred people who can be visiting.
+          <div class="terminal-head"><span>fixed prompt samples</span><span>lm_40m_v2</span></div>
+          <pre>The best place to visit in => the world is the Mediterranean Sea. The Mediterranean Sea is a great place to visit in the world...
 
-A smartphone camera app can => be installed by using its iPhone or iPad. A mobile phone is a device that uses an iOS device...
+A smartphone camera app can => be used to monitor the temperature of the air. The camera can be used to monitor the temperature of the air...
 
-Machine learning is useful because => you are not only an engineer, but also a computer scientist. Features: - Easy to use, easy to use...</pre>
+Machine learning is useful because => it is a powerful tool for learning. It is a powerful tool for learning...</pre>
         </div>
       </div>
     </section>
@@ -1331,25 +1334,25 @@ Machine learning is useful because => you are not only an engineer, but also a c
         <p>The data pipeline is working; the main bottleneck has moved to corpus quality and balance.</p>
       </div>
       <div class="lesson-grid">
-        <article class="lesson"><h3>Capacity matters</h3><p>The 40M model has the best validation loss and about 46 percent lower final perplexity than the 10M model.</p></article>
+        <article class="lesson"><h3>Data matters</h3><p>The 40M v2 run cut best perplexity from 36.55 to 22.94 versus the older 40M baseline.</p></article>
         <article class="lesson"><h3>Tokens are not enough</h3><p>The 10M model saw the most tokens per parameter and still had the worst validation loss.</p></article>
         <article class="lesson"><h3>Loss needs samples</h3><p>The best loss still produced shallow continuations, so fixed prompt checks remain necessary.</p></article>
-        <article class="lesson"><h3>Data is next</h3><p>More epochs on the same corpus will likely strengthen the same generic style bias.</p></article>
+        <article class="lesson"><h3>Decoding is next</h3><p>Greedy samples still repeat, so fixed decoding checks and stronger sampling tests are needed before task training.</p></article>
       </div>
     </section>
 
     <section id="next">
       <div class="next-panel">
         <div class="next-summary">
-          <h2>Next: improve the data, not the architecture.</h2>
-          <p>Continue with <code>lm_40m</code>, but train it on a cleaner and broader <code>lm_prose_v2</code> corpus before touching task finetuning.</p>
+          <h2>Next: fix repetition before task training.</h2>
+          <p>Keep <code>lm_40m_v2</code> as the new base checkpoint, but treat it as a better LM baseline rather than a task-ready model.</p>
         </div>
         <div class="steps">
-          <div class="step"><strong>1</strong><span>Build <code>lm_prose_v2</code> with less repeated app-store and feature-list text.</span></div>
-          <div class="step"><strong>2</strong><span>Add broader high-quality prose while keeping packed 256-token chunks.</span></div>
-          <div class="step"><strong>3</strong><span>Train <code>lm_40m</code> first and compare against the 2026-06-15 baseline.</span></div>
-          <div class="step"><strong>4</strong><span>Only run 20M or 30M controls after the new corpus improves 40M samples.</span></div>
-          <div class="step"><strong>5</strong><span>Resume OCR/instruction/autocomplete later with a continued LM-data mix.</span></div>
+          <div class="step"><strong>1</strong><span>Evaluate more prompts with greedy, top-k, and nucleus sampling to separate model repetition from decoding repetition.</span></div>
+          <div class="step"><strong>2</strong><span>Inspect <code>lm_prose_v2</code> for repeated boilerplate that may still be teaching phrase loops.</span></div>
+          <div class="step"><strong>3</strong><span>Keep the 40M v2 checkpoint as the baseline for any next corpus cleanup.</span></div>
+          <div class="step"><strong>4</strong><span>Only run task finetuning after fixed prompt samples stop collapsing into repeated clauses.</span></div>
+          <div class="step"><strong>5</strong><span>When task training resumes, mix continued LM data to reduce forgetting and style collapse.</span></div>
         </div>
       </div>
     </section>
@@ -1357,7 +1360,7 @@ Machine learning is useful because => you are not only an engineer, but also a c
 
   <footer>
     <div class="footer-inner">
-      Generated from local training artifacts in <code>std_gallery</code>. Project status captured on 2026-06-15.
+      Generated from local training artifacts in <code>std_gallery</code>. Project status captured on 2026-06-19.
     </div>
   </footer>
 
@@ -1366,7 +1369,7 @@ Machine learning is useful because => you are not only an engineer, but also a c
       m10: { params: "8.8M", loss: "4.2178", ppl: "67.88", speed: "40,208", level: "very weak", deg: "100deg", color: "#c7472f" },
       m20: { params: "20.3M", loss: "3.8677", ppl: "47.83", speed: "21,438", level: "weak baseline", deg: "70deg", color: "#b66a00" },
       m30: { params: "31.3M", loss: "3.7042", ppl: "40.62", speed: "13,764", level: "early base LM", deg: "60deg", color: "#2f6fb1" },
-      m40: { params: "39.7M", loss: "3.5988", ppl: "36.55", speed: "11,350", level: "best baseline", deg: "54deg", color: "#27854e" }
+      m40: { params: "39.7M", loss: "3.1329", ppl: "22.94", speed: "13,610", level: "best loss, looping", deg: "34deg", color: "#008c8c" }
     };
 
     const dial = document.getElementById("dial");

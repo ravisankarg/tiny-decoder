@@ -9,6 +9,17 @@ export HF_HOME="${HF_HOME:-$PWD/data/.hf_home}"
 export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-$PWD/data/.hf_datasets_cache}"
 export HF_HUB_CACHE="${HF_HUB_CACHE:-$PWD/data/.hf_hub_cache}"
 
+# Large streaming parquet shards can exceed Hugging Face's short default HTTP
+# timeout on normal home connections. Keep these overrideable from the shell.
+export HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-120}"
+export HF_HUB_ETAG_TIMEOUT="${HF_HUB_ETAG_TIMEOUT:-60}"
+
+if [[ -n "${HF_TOKEN:-}" && -z "${HUGGINGFACE_HUB_TOKEN:-}" ]]; then
+  export HUGGINGFACE_HUB_TOKEN="$HF_TOKEN"
+elif [[ -n "${HUGGINGFACE_HUB_TOKEN:-}" && -z "${HF_TOKEN:-}" ]]; then
+  export HF_TOKEN="$HUGGINGFACE_HUB_TOKEN"
+fi
+
 # Full target for the next 40M-only run. Override this for smoke tests, e.g.
 # LM_PROSE_V2_TARGET_TOKENS=2000000 scripts/prepare_lm_prose_v2.sh --overwrite
 export LM_PROSE_V2_TARGET_TOKENS="${LM_PROSE_V2_TARGET_TOKENS:-1200000000}"

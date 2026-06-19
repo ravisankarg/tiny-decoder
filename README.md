@@ -4,7 +4,7 @@ This repo is an ablation study for tiny decoder-only language models. The experi
 
 The main goal is not to train a large general assistant. The goal is to learn how far very small decoders can go when the data pipeline, objective, tokenizer, model size, and finetuning stages are designed carefully.
 
-The current study compares approximately 9M, 20M, 31M, and 40M parameter decoder configs on the same base LM corpus. Once the base LM behavior is coherent, later iterations will add narrow task skills such as OCR-style field extraction, instruction parsing, and autocomplete.
+The current study compares approximately 9M, 20M, 31M, and 40M parameter decoder configs on the same base LM corpus, then tests whether a cleaner 40M-only corpus improves the strongest config. Once the base LM behavior is coherent, later iterations will add narrow task skills such as OCR-style field extraction, instruction parsing, and autocomplete.
 
 ## Ablation Study Goal
 
@@ -163,7 +163,7 @@ The packed LM dataset is built from `data/corpus.txt` into:
 
 The improved prose LM path also adds app-description sources so the base model sees smartphone and application-domain language before task finetuning. Current public sources include Google Play app metadata from MobileRec and Mac App Store description text. These are used as prose documents, not as scraped live store pages.
 
-The current full model-size comparison processed about 4.071B cumulative training token slots over three epochs. This is large enough to show a clear size trend, but the generated text is still shallow and repetitive, so the result should be treated as a useful base-LM baseline rather than a finished language model.
+The full model-size comparison processed about 4.071B cumulative training token slots over three epochs. The follow-up `lm_40m_v2` run processed 3.457B token slots on `lm_prose_v2` and reached much lower validation loss, but the generated text is still repetitive, so the result should be treated as a better base-LM baseline rather than a finished language model.
 
 The expanded prose corpus can stream additional public text from:
 
@@ -230,6 +230,7 @@ Common training setup:
 | `lm_20m` | `model_config.json` | 8 | 384 | 6 | 1,536 | 20,340,480 | 16 | 4 | 2.8819 | 3.8677 | 47.83 |
 | `lm_30m` | `model_config_30m.json` | 10 | 448 | 7 | 1,792 | 31,311,616 | 8 | 8 | 2.7437 | 3.7047 | 40.64 |
 | `lm_40m` | `model_config_40m.json` | 10 | 512 | 8 | 2,048 | 39,716,864 | 4 | 16 | 2.6767 | 3.6010 | 36.63 |
+| `lm_40m_v2` | `model_config_40m.json` | 10 | 512 | 8 | 2,048 | 39,716,864 | 16 | 8 | 3.1276 | 3.1331 | 22.95 |
 
 Best checkpoint metrics:
 
@@ -239,17 +240,19 @@ Best checkpoint metrics:
 | `lm_20m` | 248,500 | 3.8677 | 47.83 | 248,500 | 200.16 | 3,165.3 min | 21,438 |
 | `lm_30m` | 248,000 | 3.7042 | 40.62 | 248,500 | 130.03 | 4,930.0 min | 13,764 |
 | `lm_40m` | 247,000 | 3.5988 | 36.55 | 248,500 | 102.51 | 5,978.6 min | 11,350 |
+| `lm_40m_v2` | 105,000 | 3.1329 | 22.94 | 105,500 | 87.04 | 4,233.4 min | 13,610 |
 
 ### Language Capability Level
 
-The strongest objective metric is validation loss on held-out packed prose. By that metric, model size helped consistently: `lm_40m` is best, then `lm_30m`, then `lm_20m`, then `lm_10m`.
+The strongest objective metric is validation loss on held-out packed prose. In the original same-corpus ablation, model size helped consistently: `lm_40m` beat `lm_30m`, `lm_20m`, and `lm_10m`. The follow-up `lm_40m_v2` run on `lm_prose_v2` is now the best objective checkpoint overall, with best validation loss `3.1329` and best perplexity `22.94`.
 
 Qualitative fixed-seed continuation checks on 2026-06-15 showed:
 
 - `lm_10m`: can form English sentences, but loops simple phrases and generic words. Capability level: very weak base LM.
 - `lm_20m`: more sentence-like and sometimes topical, but still confuses domains and invents odd facts. Capability level: weak but usable for pipeline checks.
 - `lm_30m`: better grammar and topical consistency, but still repeats app-description style and shallow clauses. Capability level: early base LM.
-- `lm_40m`: best validation loss and most readable continuations, but still repetitive, generic, and not reliable. Capability level: best current base LM, not ready for task finetuning as a language backbone.
+- `lm_40m`: best original same-corpus validation loss and most readable continuations, but still repetitive, generic, and not reliable.
+- `lm_40m_v2`: much better validation loss on the cleaner `lm_prose_v2` corpus, but greedy continuations still collapse into repeated phrases. Capability level: best current base LM, still not ready for task finetuning.
 
 Representative samples from `lm_40m`:
 
@@ -259,13 +262,22 @@ A smartphone camera app can => be installed by using its iPhone or iPad. A mobil
 Machine learning is useful because => you are not only an engineer, but also a computer scientist. Features: - Easy to use, easy to use...
 ```
 
+Representative samples from `lm_40m_v2` on 2026-06-19:
+
+```text
+The best place to visit in => the world is the Mediterranean Sea. The Mediterranean Sea is a great place to visit in the world...
+A smartphone camera app can => be used to monitor the temperature of the air. The camera can be used to monitor the temperature of the air...
+Machine learning is useful because => it is a powerful tool for learning. It is a powerful tool for learning...
+```
+
 ### Learnings
 
-- Capacity matters in this setup. The 40M model has the best final validation loss and about 46 percent lower perplexity than the 10M model.
+- Capacity matters in this setup. The original 40M model had the best same-corpus validation loss and about 46 percent lower perplexity than the 10M model.
+- Data quality matters at least as much now. The 40M v2 run cut best perplexity from `36.55` to `22.94` versus the older 40M baseline, a 36.9 percent reduction.
 - The larger models are much slower, but the quality gain is real. `lm_40m` ran at about 11.3k tokens/sec versus about 40.2k tokens/sec for `lm_10m`.
 - The 10M model received the most tokens per parameter, but it still had the worst validation loss. More tokens per parameter did not overcome limited capacity.
 - The current dataset teaches fluent surface text but appears too repetitive and app-description-heavy. Generated text often falls into generic feature-list language.
-- Validation loss alone is not enough. The 40M model has the best loss, but samples still show repetition and weak semantics.
+- Validation loss alone is not enough. The 40M v2 model has the best loss, but samples still show repetition and weak semantics.
 
 ### Mistakes To Avoid Repeating
 
@@ -276,16 +288,15 @@ Machine learning is useful because => you are not only an engineer, but also a c
 
 ### Recommendation
 
-Continue with the 40M config, but do not simply repeat the same 40M training on the same `lm_prose` data. The best next experiment is a 40M Stage 1 run on cleaner and broader packed prose:
+Use `lm_40m_v2` as the new base-LM baseline, but do not start OCR/instruction/autocomplete finetuning yet:
 
-1. Build a new `lm_prose_v2` corpus with less repeated app-store language and more high-quality general text.
-2. Keep 256 context for the next controlled run so it remains comparable.
-3. Train `lm_40m` first, because it is the best current quality point.
-4. Add a short 20M or 30M control only after the 40M v2 run shows better samples.
-5. Track both validation loss/perplexity and a fixed qualitative prompt set.
-6. Only begin task finetuning after the 40M base model can continue simple prompts without obvious loops.
+1. Evaluate more prompts with greedy, top-k, and nucleus sampling to separate model repetition from decoding repetition.
+2. Inspect `lm_prose_v2` for repeated boilerplate that may still be teaching phrase loops.
+3. Keep 256 context for the next controlled cleanup run so it remains comparable.
+4. Track both validation loss/perplexity and a fixed qualitative prompt set.
+5. Only begin task finetuning after the 40M base model can continue simple prompts without obvious loops.
 
-The practical answer: yes, continue 40M training, but with new data and cleaner corpus balance, not more epochs on the same corpus. If the goal is language capability, data quality and diversity are now the next bottleneck more than architecture.
+The practical answer: `lm_prose_v2` helped a lot objectively, but the model is still a base-LM checkpoint, not a task-ready assistant backbone.
 
 Plots can be regenerated from local checkpoint CSVs with:
 
@@ -306,13 +317,12 @@ If the base LM still repeats tokens or produces nonsense, task training should n
 
 ## Next Planned Iterations
 
-After the 2026-06-15 Stage 1 ablation, the next work should improve the 40M base LM before any task-specific training:
+After the 2026-06-19 `lm_40m_v2` result, the next work should reduce repetition before any task-specific training:
 
-1. Build `lm_prose_v2` with cleaner, broader packed prose and less repetitive app-description text.
-2. Train `lm_40m` on the new data first, using the same 256-token context and fixed prompt evals.
-3. Compare validation loss, perplexity, and qualitative continuations against the 2026-06-15 `lm_40m` baseline.
-4. Only if the base LM improves, run a smaller 20M or 30M control to check whether the data improvement generalizes.
-5. Add instruction/OCR/autocomplete training later with a small learning rate and a continued LM-data mix to reduce forgetting.
+1. Run a broader fixed-prompt eval with multiple decoding modes.
+2. Clean remaining repeated boilerplate from `lm_prose_v2` if the prompt eval points back to corpus style.
+3. Keep `lm_40m_v2` as the baseline checkpoint for any next corpus cleanup.
+4. Add instruction/OCR/autocomplete training later with a small learning rate and a continued LM-data mix to reduce forgetting.
 
 ## Key Lesson
 
